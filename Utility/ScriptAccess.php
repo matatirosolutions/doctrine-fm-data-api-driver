@@ -1,0 +1,54 @@
+<?php
+/**
+ * Created by PhpStorm.
+ * User: SteveWinter
+ * Date: 10/04/2017
+ * Time: 15:10
+ */
+
+namespace MSDev\DoctrineFMDataAPIDriver\Utility;
+
+use Doctrine\DBAL\Connection;
+use MSDev\DoctrineFMDataAPIDriver\Exceptions\FMException;
+use MSDev\DoctrineFMDataAPIDriver\FMConnection;
+use \FileMaker;
+
+class ScriptAccess
+{
+
+    /**
+     * @var FMConnection
+     */
+    protected $con;
+
+    /**
+     * @var FileMaker
+     */
+    protected $fm;
+
+    /**
+     * ScriptAccess constructor.
+     * @param Connection $conn
+     */
+    function __construct(Connection $conn)
+    {
+        $this->con = $conn->getWrappedConnection();
+        $this->fm = $this->con->getConnection();
+    }
+
+
+    public function performScript($layout, $script, $params = null)
+    {
+        $cmd = $this->fm->newPerformScriptCommand($layout, $script, $params);
+        $res = $cmd->execute();
+
+        if($this->con->isError($res)) {
+            switch($res->code) {
+                default:
+                    throw new FMException($res->message, $res->code);
+            }
+        }
+
+        return $res;
+    }
+}
