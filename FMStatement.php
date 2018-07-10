@@ -73,7 +73,7 @@ class FMStatement implements \IteratorAggregate, Statement
     private $response;
 
     /**
-     * Records returned pon successful query
+     * Records returned upon successful query
      *
      * @var array
      */
@@ -104,8 +104,6 @@ class FMStatement implements \IteratorAggregate, Statement
     /** @var FMConnection  */
     private $conn;
 
-    /** @var  \FileMaker_Command */
-    private $cmd;
 
     /**
      * @param string $stmt
@@ -196,7 +194,7 @@ class FMStatement implements \IteratorAggregate, Statement
         $this->request = $this->sqlParser->parse($query);
 
         $this->id = Uniqid('', true).mt_rand(999, 999999);
-        $this->cmd = $this->qb->getQueryFromRequest($this->request, $this->_stmt, $this->_bindParam);
+        $this->qb->getQueryFromRequest($this->request, $this->_stmt, $this->_bindParam);
 
         if($this->conn->isTransactionOpen()) {
             $this->conn->queryStack[$this->id] = clone $this;
@@ -207,24 +205,9 @@ class FMStatement implements \IteratorAggregate, Statement
 
     public function performCommand()
     {
-        $this->response = $this->cmd->execute();
-
-        if ($this->isError($this->response)) {
-            if (401 == $this->response->code) {
-                return null;
-            }
-            /** @var FileMaker_Error $res */
-            throw new FMException($this->response->getMessage(), $this->response->code);
-        }
-
-        $this->records = $this->response->getRecords();
-
+        $this->records = $this->conn->performFMRequest($this->qb->getMethod(), $this->qb->getUri(), $this->qb->getOptions());
         $this->numRows = count($this->records);
         $this->result = true;
-    }
-
-    private function isError($in) {
-        return is_a($in, 'FileMaker_Error');
     }
 
     /**
@@ -336,13 +319,13 @@ class FMStatement implements \IteratorAggregate, Statement
     }
 
     /**
-     * Parses a FileMaker record object into an array whose keys are the fields from
+     * Parses a FileMaker record into an array whose keys are the fields from
      * the requested query.
      *
-     * @param FileMaker_Record $rec
+     * @param  array $rec
      * @return array
      */
-    private function recordToArray(FileMaker_Record $rec)
+    private function recordToArray(array $rec)
     {
 
         $select = $this->request['SELECT'];
@@ -353,11 +336,11 @@ class FMStatement implements \IteratorAggregate, Statement
         $resp = [];
         foreach($select as $field) {
             if('rec_id' === $field['no_quotes']['parts'][1]) {
-                $resp[$field['alias']['no_quotes']['parts'][0]] = $rec->getRecordId();
+                $resp[$field['alias']['no_quotes']['parts'][0]] = $rec['recordId'];
                 continue;
             }
             if('mod_id' === $field['no_quotes']['parts'][1]) {
-                $resp[$field['alias']['no_quotes']['parts'][0]] = $rec->getModificationId();
+                $resp[$field['alias']['no_quotes']['parts'][0]] = $rec['modId'];
                 continue;
             }
             if('rec_meta' === $field['no_quotes']['parts'][1]) {
@@ -365,7 +348,7 @@ class FMStatement implements \IteratorAggregate, Statement
                 continue;
             }
 
-            $data = $rec->getField($field['no_quotes']['parts'][1]);
+            $data = $rec['fieldData'][$field['no_quotes']['parts'][1]];
             $resp[$field['alias']['no_quotes']['parts'][0]] = $data == "" ? null : $data;
         }
 
@@ -380,20 +363,21 @@ class FMStatement implements \IteratorAggregate, Statement
     public function extractID()
     {
         $idColumn = $this->qb->getIdColumn($this->request, new MetaData());
-        return $this->records[0]->getField($idColumn);
+        return $this->records[0][$idColumn];
     }
 
     /**
-     * Extract query metadata from the returned response
+     * Extract query metadata from the returned response - not currently supported by the
+     * DataAPI - hopefully in FMS 18
      *
      * @return array
      */
     private function getMetadataArray()
     {
         return json_encode([
-            'found' => (int)$this->response->getFoundSetCount(),
-            'fetch' => (int)$this->response->getFetchCount(),
-            'total' => (int)$this->response->getTableRecordCount(),
+            'found' => 0,
+            'fetch' => 0,
+            'total' => 0,
         ]);
     }
 

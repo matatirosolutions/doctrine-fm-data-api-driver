@@ -9,31 +9,35 @@
 namespace MSDev\DoctrineFMDataAPIDriver\Utility;
 
 use Doctrine\ORM\Mapping\ClassMetadata;
+use MSDev\DoctrineFMDataAPIDriver\Exception\AuthenticationException;
 use MSDev\DoctrineFMDataAPIDriver\FMConnection;
 use MSDev\DoctrineFMDataAPIDriver\Exceptions\FMException;
 use Symfony\Component\Intl\Exception\NotImplementedException;
 
 class QueryBuilder
 {
-    /** @var
-     * FileMaker
-     */
-    private $fmp;
+    /** @var FMConnection */
+    private $connetion;
 
-    /**
-     * @var string
-     */
+    /** @var string */
     private $operation;
 
-    /**
-     * @var array
-     */
+    /** @var array */
     private $query;
 
+    /** @var string */
+    private $method;
 
-    public function __construct(FMConnection $conn)
+    /** @var string */
+    private $uri;
+
+    /** @var array */
+    private $options = [];
+
+
+    public function __construct(FMConnection $connetion)
     {
-        $this->fmp = $conn->getConnection();
+        $this->connetion = $connetion;
     }
 
 
@@ -42,6 +46,29 @@ class QueryBuilder
         return $this->operation;
     }
 
+    /**
+     * @return string
+     */
+    public function getMethod()
+    {
+        return $this->method;
+    }
+
+    /**
+     * @return string
+     */
+    public function getUri()
+    {
+        return $this->uri;
+    }
+
+    /**
+     * @return array
+     */
+    public function getOptions(): array
+    {
+        return $this->options;
+    }
 
     public function getQueryFromRequest(array $tokens, string $statement, array $params) {
         $this->operation = strtolower(array_keys($tokens)[0]);
@@ -61,40 +88,57 @@ class QueryBuilder
     }
 
 
-    private function generateFindCommand($tokens, $params) {
+    private function generateFindCommand($tokens, $params)
+    {
         $layout = $this->getLayout($tokens);
-
         if (empty($this->query['WHERE'])) {
-            $cmd = $this->fmp->newFindAllCommand($layout);
-        } else {
-            $cmd = $this->generateWhere($params, $layout);
+            $this->body = [];
+            $this->method = 'GET';
+            $this->uri = sprintf('layouts/%s/records', $layout);
+
+            if(array_key_exists('ORDER', $this->query)) {
+                $this->uri .= '?_sort='.json_encode($this->getSort());
+            }
+            return;
         }
+
+        $this->method = 'POST';
+        $this->uri = sprintf('layouts/%s/_find', $layout);
+        $body = [
+            'query' => $this->generateWhere($params, $layout)
+        ];
 
         // Sort
         if(array_key_exists('ORDER', $this->query)) {
-            foreach($this->query['ORDER'] as $k => $rule) {
-                $dir = 'ASC' == $rule['direction'] ? FILEMAKER_SORT_ASCEND : FILEMAKER_SORT_DESCEND;
-                $cmd->addSortRule($rule['no_quotes']['parts'][1], $k+1, $dir);
-            }
+            $body['sort'] = $this->getSort();
         }
 
         // Limit
         if('subquery' == $tokens['FROM'][0]['expr_type']) {
-            if('subquery' == $tokens['FROM'][0]['expr_type']) {
-                $cmd->setRange(
-                    $this->getSkip($tokens),
-                    $this->getMax($tokens)
-                );
-            }
+            $body['offset'] = $this->getSkip($tokens);
+            $body['limit'] = $this->getMax($tokens);
         }
 
-        return $cmd;
+        $this->options = [
+            'body' => json_encode($body)
+        ];
     }
 
 
-    private function generateUpdateCommand($tokens, $statement, $params) {
+    /**
+     * @param $tokens
+     * @param $statement
+     * @param $params
+     *
+     * @throws FMException
+     */
+    private function generateUpdateCommand($tokens, $statement, $params)
+    {
         $layout = $this->getLayout($tokens);
         $recID = $this->getRecordID($tokens, $layout);
+
+        $this->method = 'PATCH';
+        $this->uri = sprintf('layouts/%s/records/%s', $layout, $recID);
 
         $data = $matches = [];
         $count = 1;
@@ -111,7 +155,11 @@ class QueryBuilder
             }
         }
 
-        return $this->fmp->newEditCommand($layout, $recID, $data);
+        $this->options = [
+            'body' => json_encode([
+                'fieldData' => $data,
+            ])
+        ];
     }
 
 
@@ -124,24 +172,6 @@ class QueryBuilder
     }
 
 
-    private function getRecordID($tokens, $layout)
-    {
-        $cmd = $this->fmp->newFindCommand($layout);
-        $value = '==';
-        for($i=2; $i<count($tokens['WHERE']); $i++) {
-            $value .= $tokens['WHERE'][$i]['base_expr'];
-        }
-        $cmd->addFindCriterion($tokens['WHERE'][0]['base_expr'], $value);
-
-        $res = $cmd->execute();
-
-        if(is_a($res, 'FileMaker_Error')) {
-            /** @var FileMaker_Error $res */
-            throw new FMException($res->getMessage(), $res->code);
-        }
-
-        return $res->getFirstRecord()->getRecordId();
-    }
 
 
     private function generateInsertCommand($tokens, $params)
@@ -165,11 +195,45 @@ class QueryBuilder
         return $this->fmp->newAddCommand($layout, $data);
     }
 
+    /**
+     * @param $tokens
+     * @param $layout
+     *
+     * @return integer
+     * @throws FMException
+     */
+    private function getRecordID($tokens, $layout): int
+    {
+        $value = '';
+        for($i=2; $i<count($tokens['WHERE']); $i++) {
+            $value .= $tokens['WHERE'][$i]['base_expr'];
+        }
+        $options = [
+            'body' => json_encode([
+                'query' => [
+                    [$tokens['WHERE'][0]['base_expr'] => $value]
+                ]
+            ])
+        ];
+        $uri = sprintf('layouts/%s/_find', $layout);
+        try {
+            $record = $this->connetion->performFMRequest('POST', $uri, $options);
+            return $record[0]['recordId'];
+        } catch (\Exception $e) {
+            throw new FMException($e->getMessage(), $e->getCode());
+        }
+    }
 
+    /**
+     * @param array $tokens
+     * @return mixed
+     *
+     * @throws FMException
+     */
     public function getLayout(array $tokens) {
         $this->query = $tokens;
         if (empty($tokens['FROM']) && empty($tokens['INSERT']) && empty($tokens['UPDATE'])) {
-            throw new \Exception('Unknown layout');
+            throw new FMException('Unknown layout');
         }
 
         switch($this->operation) {
@@ -186,28 +250,28 @@ class QueryBuilder
         }
     }
 
-    private function generateWhere($params, $layout)
+    /**
+     * @param array $params
+     * @return array
+     */
+    private function generateWhere($params)
     {
+        $request = [];
         $cols = $this->selectColumns($this->query);
-        $cmd = $this->fmp->newFindCommand($layout);
+        //$cmd = $this->fmp->newFindCommand($layout);
         $pc = 1;
 
         for($c = 0; $c<count($this->query['WHERE']); $c++) {
             $query = $this->query['WHERE'][$c];
 
             if(array_key_exists($query['base_expr'], $cols)) {
-                // if the comparison operator is '=' then double up to '==' plus strip off 'LIKE'
-                $comp = $this->query['WHERE'][$c+1]['base_expr'];
-                $op = '=' == $comp ? '==' : ('LIKE' == $comp ? '' : $comp);
-
-                $field = $query['no_quotes']['parts'][1];
-                $value = $op.$params[$pc];
-
-                $cmd->addFindCriterion($field, $value);
+                $op = $this->getOperator($this->query['WHERE'][$c+1]['base_expr'], $params[$pc]);
+                $request[$query['no_quotes']['parts'][1]] = $op.$params[$pc];
                 $pc++;
             }
         }
-        return $cmd;
+
+        return [$request];
     }
 
 
@@ -263,10 +327,10 @@ class QueryBuilder
     private function getSkip($tokens)
     {
         if(isset($tokens['WHERE'][1]['base_expr']) && '>=' == $tokens['WHERE'][1]['base_expr']) {
-            return (int)$tokens['WHERE'][2]['base_expr'] - 1;
+            return (int)$tokens['WHERE'][2]['base_expr'];
         }
 
-        return 0;
+        return 1;
     }
 
     /**
@@ -287,5 +351,44 @@ class QueryBuilder
         }
 
         return 10;
+    }
+
+    /**
+     * Generate an array of sort requests
+     *
+     * @return array
+     */
+    private function getSort()
+    {
+        $sort = [];
+        foreach($this->query['ORDER'] as $k => $rule) {
+            $sort[] = [
+                'fieldName' => $rule['no_quotes']['parts'][1],
+                'sortOrder' => 'ASC' == $rule['direction'] ? 'ascend' : 'descend'
+            ];
+        }
+        return $sort;
+    }
+
+    private function getOperator($request, $parameter)
+    {
+        switch($request) {
+            case '=':
+                $param = substr($parameter, 0, 1);
+                if(in_array($param, ['=', '<', '>'])) {
+                    return '';
+                }
+                return '==';
+            // Explcitly here for clarity
+            case 'LIKE':
+                return '';
+            // TODO don't know what to do with this yet!
+            case '!=':
+                return '';
+            // Anything else get's the standard FM find method
+            default:
+                return '';
+
+        }
     }
 }

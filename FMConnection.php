@@ -9,13 +9,15 @@
 namespace MSDev\DoctrineFMDataAPIDriver;
 
 use Doctrine\DBAL\Connection as AbstractConnection;
-use \FileMaker;
+use GuzzleHttp\Client;
+use MSDev\DoctrineFMDataAPIDriver\Exceptions\FMException;
+use MSDev\DoctrineFMDataAPIDriver\Exception\AuthenticationException;
 
 class FMConnection extends AbstractConnection
 {
 
     /**
-     * @var FileMaker
+     * @var
      */
     private $connection = null;
 
@@ -34,14 +36,17 @@ class FMConnection extends AbstractConnection
      */
     protected $params;
 
+    protected $baseURI;
+    protected $token;
+    protected $retried = false;
+
     public $queryStack = [];
 
     public function __construct(array $params, FMDriver $driver)
     {
         $this->params = $params;
-
-        $hostspec = $params['host'] . empty($params['port']) ?: ':'.$params['port'];
-        $this->connection = new FileMaker($params['dbname'], $hostspec, $params['user'], $params['password']);
+        $this->setBaseURL($params['host'], $params['dbname']);
+        $this->fetchToken($params);
 
         parent::__construct($params, $driver);
     }
@@ -120,13 +125,82 @@ class FMConnection extends AbstractConnection
         return $this->connection;
     }
 
-    public function isError($in) {
-        return is_a($in, 'FileMaker_Error');
-    }
-
     public function getParameters()
     {
         return $this->params;
     }
+
+    /**
+     * @param $method
+     * @param $uri
+     * @param $options
+     *
+     * @return array
+     * @throws AuthenticationException
+     */
+    public function performFMRequest($method, $uri, $options)
+    {
+        $client = new Client();
+        $headers = [
+            'headers' => [
+                'Content-Type' => 'application/json',
+                'Authorization' => sprintf('Bearer %s', $this->token),
+            ]
+        ];
+
+        try {
+            $response = $client->request($method, $this->baseURI.$uri, array_merge($headers, $options));
+
+            $content = json_decode($response->getBody()->getContents(), true);
+            return isset($content['response']['data']) ? $content['response']['data'] : $content['response'];
+        } catch (\Exception $e) {
+            $content = json_decode($e->getResponse()->getBody()->getContents());
+            if(401 == $content->messages[0]->code) {
+                // no records found
+                return [];
+            }
+
+            // if the token has expired or is invalid then in theory 952 will come back
+            // but sometimes you get 105 missing layout (go figure), so try a token refresh
+            if(in_array($content->messages[0]->code, [105, 952]) && !$this->retried) {
+                $this->retried = true;
+                $this->fetchToken($this->session);
+                $this->performFMRequest($method, $uri, $options);
+            }
+
+            throw new FMException($content->messages[0]->message, $content->messages[0]->code);
+        }
+    }
+
+    private function setBaseURL($host, $database)
+    {
+        $this->baseURI =
+            ('http' == substr($host, 4) ? $host : 'https://' . $host) .
+            ('/' == substr($host, -1) ? '' : '/') .
+            'fmi/data/v1/databases/' .
+            $database . '/';
+    }
+
+    private function fetchToken(array $params)
+    {
+        $client = new Client();
+        try {
+            $response = $client->request('POST', $this->baseURI . 'sessions', [
+                'headers' => [
+                    'Content-Type' => 'application/json'
+                ],
+                'auth' => [
+                    $params['user'], $params['password']
+                ]
+            ]);
+
+            $content = json_decode($response->getBody()->getContents());
+            $this->token = $content->response->token;
+        } catch (\Exception $e) {
+            $content = json_decode($e->getResponse()->getBody()->getContents());
+            throw new AuthenticationException($content->messages[0]->message, $content->messages[0]->code);
+        }
+    }
+
 
 }
