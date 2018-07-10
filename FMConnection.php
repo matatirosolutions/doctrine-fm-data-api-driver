@@ -164,7 +164,7 @@ class FMConnection extends AbstractConnection
             // but sometimes you get 105 missing layout (go figure), so try a token refresh
             if(in_array($content->messages[0]->code, [105, 952]) && !$this->retried) {
                 $this->retried = true;
-                $this->fetchToken($this->session);
+                $this->fetchToken($this->params);
                 $this->performFMRequest($method, $uri, $options);
             }
 
