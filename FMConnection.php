@@ -137,7 +137,9 @@ class FMConnection extends AbstractConnection
      * @param $options
      *
      * @return array
+     *
      * @throws AuthenticationException
+     * @throws FMException
      */
     public function performFMRequest($method, $uri, $options)
     {

@@ -35,18 +35,18 @@ class ScriptAccess
      * @param int $recId
      * @param string $script
      * @param string $param
-     * @return mixed
+     *
+     * @return array
+     *
      * @throws FMException
      */
     public function performScript($layout, $recId, $script, $param = '')
     {
         $uri = sprintf('/layouts/%s/records/%s?script=%s&script.param=%s', $layout, $recId, $script, $param);
         try {
-            $response = $this->conn->performFMRequest('GET', $uri, []);
+            return $this->conn->performFMRequest('GET', $uri, []);
         } catch(\Exception $e) {
             throw new FMException($e->getMessage(), $e->getCode());
         }
-
-        return $response;
     }
 }
