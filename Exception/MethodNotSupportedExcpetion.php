@@ -6,7 +6,7 @@
  * Time: 08:40
  */
 
-namespace MSDev\DoctrineFMDataAPIDriver\Exceptions;
+namespace MSDev\DoctrineFMDataAPIDriver\Exception;
 
 
 class MethodNotSupportedExcpetion extends FMException

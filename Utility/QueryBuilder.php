@@ -172,8 +172,6 @@ class QueryBuilder
     }
 
 
-
-
     private function generateInsertCommand($tokens, $params)
     {
         $layout = $this->getLayout($tokens);
@@ -182,6 +180,8 @@ class QueryBuilder
 
         // need to know which is the Id column
         $idColumn = $this->getIdColumn($tokens, new MetaData());
+        $this->method = 'POST';
+        $this->uri = sprintf('layouts/%s/records', $layout);
 
         $data = [];
         foreach($fields as $c => $f) {
@@ -192,7 +192,11 @@ class QueryBuilder
             $data[$field] = $params[$c+1];
         }
 
-        return $this->fmp->newAddCommand($layout, $data);
+        $this->options = [
+            'body' => json_encode([
+                'fieldData' => $data,
+            ])
+        ];
     }
 
     /**

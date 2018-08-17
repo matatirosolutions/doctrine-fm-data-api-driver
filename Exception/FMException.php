@@ -1,6 +1,6 @@
 <?php
 
-namespace MSDev\DoctrineFMDataAPIDriver\Exceptions;
+namespace MSDev\DoctrineFMDataAPIDriver\Exception;
 
 use Exception;
 

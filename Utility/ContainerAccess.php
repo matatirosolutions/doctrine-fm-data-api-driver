@@ -9,7 +9,7 @@
 namespace MSDev\DoctrineFMDataAPIDriver\Utility;
 
 use Doctrine\DBAL\Connection;
-use MSDev\DoctrineFMDataAPIDriver\Exceptions\FMException;
+use MSDev\DoctrineFMDataAPIDriver\Exception\FMException;
 use MSDev\DoctrineFMDataAPIDriver\FMConnection;
 use GuzzleHttp\Client;
 use \FileMaker;

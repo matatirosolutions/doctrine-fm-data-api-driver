@@ -81,24 +81,6 @@ and replace it with
          */
         private $modId;
         
-6. To access query metadata add a rec_meta pseudo property of type json_array
-
-        /**
-        * @var array
-        *
-        * @Column(name="rec_meta", type="json_array")
-        */
-        private $meta;         
-        
-    This will be populated with an array containing
-
-        [
-             'found' => (int)$this->response->getFoundSetCount(),
-             'fetch' => (int)$this->response->getFetchCount(),
-             'total' => (int)$this->response->getTableRecordCount(),
-        ]    
-        
-    Which you can then access from any record in your returned set.
 
 ## Considerations ##
 

@@ -21,7 +21,7 @@ namespace MSDev\DoctrineFMDataAPIDriver;
 
 use Doctrine\DBAL\Driver;
 use Doctrine\DBAL\Connection;
-use MSDev\DoctrineFMDataAPIDriver\Exceptions\MethodNotSupportedExcpetion;
+use MSDev\DoctrineFMDataAPIDriver\Exception\MethodNotSupportedExcpetion;
 
 /**
  * FileMaker PHP API Driver.

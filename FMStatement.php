@@ -23,10 +23,8 @@ use Doctrine\DBAL\Driver\Statement;
 use MSDev\DoctrineFMDataAPIDriver\Utility\MetaData;
 use PHPSQLParser\PHPSQLParser;
 use MSDev\DoctrineFMDataAPIDriver\Utility\QueryBuilder;
-use MSDev\DoctrineFMDataAPIDriver\Exceptions\FMException;
-use MSDev\DoctrineFMDataAPIDriver\Exceptions\MethodNotSupportedExcpetion;
-use \FileMaker_Error;
-use \FileMaker_Record;
+use MSDev\DoctrineFMDataAPIDriver\Exception\FMException;
+use MSDev\DoctrineFMDataAPIDriver\Exception\MethodNotSupportedExcpetion;
 
 class FMStatement implements \IteratorAggregate, Statement
 {
@@ -68,7 +66,7 @@ class FMStatement implements \IteratorAggregate, Statement
     /**
      * Hold the response from FileMaker be it a result object or and error object
      *
-     * @var \FileMaker_Error|\FileMaker_Result
+     * @var array
      */
     private $response;
 
@@ -363,7 +361,18 @@ class FMStatement implements \IteratorAggregate, Statement
     public function extractID()
     {
         $idColumn = $this->qb->getIdColumn($this->request, new MetaData());
-        return $this->records[0][$idColumn];
+        if('rec_id' == $idColumn) {
+            return $this->records['recordId'];
+        }
+
+        $uri = $this->qb->getUri() .'/' . $this->records['recordId'];
+        try {
+            $record = $this->conn->performFMRequest('GET', $uri, $this->qb->getOptions());
+            return $record[0]['fieldData'][$idColumn];
+        } catch(\Exception $e) {
+            throw new FMException('Unable to locate record primary key with error '. $e->getMessage());
+        }
+
     }
 
     /**

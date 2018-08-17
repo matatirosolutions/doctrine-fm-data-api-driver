@@ -10,7 +10,8 @@ namespace MSDev\DoctrineFMDataAPIDriver;
 
 use Doctrine\DBAL\Connection as AbstractConnection;
 use GuzzleHttp\Client;
-use MSDev\DoctrineFMDataAPIDriver\Exceptions\FMException;
+use GuzzleHttp\Exception\ClientException;
+use MSDev\DoctrineFMDataAPIDriver\Exception\FMException;
 use MSDev\DoctrineFMDataAPIDriver\Exception\AuthenticationException;
 
 class FMConnection extends AbstractConnection
@@ -150,8 +151,8 @@ class FMConnection extends AbstractConnection
 
         try {
             $response = $client->request($method, $this->baseURI.$uri, array_merge($headers, $options));
-
             $content = json_decode($response->getBody()->getContents(), true);
+
             return isset($content['response']['data']) ? $content['response']['data'] : $content['response'];
         } catch (\Exception $e) {
             $content = json_decode($e->getResponse()->getBody()->getContents());
@@ -164,10 +165,10 @@ class FMConnection extends AbstractConnection
             // but sometimes you get 105 missing layout (go figure), so try a token refresh
             if(in_array($content->messages[0]->code, [105, 952]) && !$this->retried) {
                 $this->retried = true;
-                $this->fetchToken($this->params);
-                $this->performFMRequest($method, $uri, $options);
-            }
+                $this->forceTokenRefresh($this->params);
+                return $this->performFMRequest($method, $uri, $options);
 
+            }
             throw new FMException($content->messages[0]->message, $content->messages[0]->code);
         }
     }
@@ -183,6 +184,11 @@ class FMConnection extends AbstractConnection
 
     private function fetchToken(array $params)
     {
+        if($token = $this->readTokenFromDisk()) {
+            $this->token = $token;
+            return;
+        }
+
         $client = new Client();
         try {
             $response = $client->request('POST', $this->baseURI . 'sessions', [
@@ -196,11 +202,44 @@ class FMConnection extends AbstractConnection
 
             $content = json_decode($response->getBody()->getContents());
             $this->token = $content->response->token;
+            $this->writeTokenToDisk();
         } catch (\Exception $e) {
+            /** @var ClientException $e */
+            if(404 == $e->getResponse()->getStatusCode()) {
+                throw new AuthenticationException($e->getResponse()->getReasonPhrase(), $e->getResponse()->getStatusCode());
+            }
+
             $content = json_decode($e->getResponse()->getBody()->getContents());
             throw new AuthenticationException($content->messages[0]->message, $content->messages[0]->code);
         }
     }
 
+    private function forceTokenRefresh($params)
+    {
+        $path = $this->getTokenDiskLocation();
+        unlink($path);
 
+        $this->fetchToken($this->params);
+    }
+
+    private function readTokenFromDisk()
+    {
+        $path = $this->getTokenDiskLocation();
+        if(!file_exists($path)) {
+            return false;
+        }
+
+        return file_get_contents($path);
+    }
+
+    private function writeTokenToDisk()
+    {
+        $path = $this->getTokenDiskLocation();
+        file_put_contents($path, $this->token);
+    }
+
+    private function getTokenDiskLocation()
+    {
+        return sys_get_temp_dir().'fmp-token.txt';
+    }
 }
