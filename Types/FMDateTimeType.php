@@ -25,6 +25,14 @@ class FMDateTimeType extends Type
         return $this->name;
     }
 
+    /**
+     * @param string $value
+     * @param AbstractPlatform $platform
+     *
+     * @return string
+     *
+     * @throws ConversionException
+     */
     public function convertToDatabaseValue($value, AbstractPlatform $platform)
     {
         if (is_null($value)) {
@@ -43,6 +51,14 @@ class FMDateTimeType extends Type
         throw ConversionException::conversionFailed(var_export($value, true), $this->name);
     }
 
+    /**
+     * @param string $value
+     * @param AbstractPlatform $platform
+     *
+     * @return \DateTime|null
+     *
+     * @throws ConversionException
+     */
     public function convertToPHPValue($value, AbstractPlatform $platform)
     {
         if (empty($value)) {

@@ -12,7 +12,7 @@ use Doctrine\DBAL\Connection;
 use MSDev\DoctrineFMDataAPIDriver\Exception\FMException;
 use MSDev\DoctrineFMDataAPIDriver\FMConnection;
 
-class ScriptAccess
+class SetGlobals
 {
 
     /**
@@ -31,20 +31,22 @@ class ScriptAccess
 
 
     /**
-     * @param string $layout
-     * @param int $recId
-     * @param string $script
-     * @param string $param
+     * @param array $globals
      *
      * @return array
      *
      * @throws FMException
      */
-    public function performScript($layout, $recId, $script, $param = '')
+    public function setGlobals($globals = [])
     {
-        $uri = sprintf('/layouts/%s/records/%s?script=%s&script.param=%s', $layout, $recId, $script, $param);
+        $uri = 'globals';
+        $opts = [
+            'body' => json_encode([
+                'globalFields' => $globals
+            ])
+        ];
         try {
-            return $this->conn->performFMRequest('GET', $uri, []);
+            return $this->conn->performFMRequest('PATCH', $uri, $opts);
         } catch(\Exception $e) {
             throw new FMException($e->getMessage(), $e->getCode());
         }

@@ -9,10 +9,9 @@
 namespace MSDev\DoctrineFMDataAPIDriver\Utility;
 
 use Doctrine\ORM\Mapping\ClassMetadata;
-use MSDev\DoctrineFMDataAPIDriver\Exception\AuthenticationException;
 use MSDev\DoctrineFMDataAPIDriver\FMConnection;
-use MSDev\DoctrineFMDataAPIDriver\Exceptions\FMException;
-use Symfony\Component\Intl\Exception\NotImplementedException;
+use MSDev\DoctrineFMDataAPIDriver\Exception\FMException;
+use MSDev\DoctrineFMDataAPIDriver\Exception\NotImplementedException;
 
 class QueryBuilder
 {

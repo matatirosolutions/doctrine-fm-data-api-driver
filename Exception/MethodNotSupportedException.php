@@ -9,7 +9,7 @@
 namespace MSDev\DoctrineFMDataAPIDriver\Exception;
 
 
-class MethodNotSupportedExcpetion extends FMException
+class MethodNotSupportedException extends FMException
 {
     public function __construct($method) {
         $msg = sprintf('FileMaker does not support %s.', $method);

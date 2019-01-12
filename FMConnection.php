@@ -9,8 +9,10 @@
 namespace MSDev\DoctrineFMDataAPIDriver;
 
 use Doctrine\DBAL\Connection as AbstractConnection;
+use Doctrine\DBAL\DBALException;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\ClientException;
+use GuzzleHttp\Exception\GuzzleException;
 use MSDev\DoctrineFMDataAPIDriver\Exception\FMException;
 use MSDev\DoctrineFMDataAPIDriver\Exception\AuthenticationException;
 
@@ -43,6 +45,15 @@ class FMConnection extends AbstractConnection
 
     public $queryStack = [];
 
+    /**
+     * FMConnection constructor.
+     *
+     * @param array $params
+     * @param FMDriver $driver
+     *
+     * @throws AuthenticationException
+     * @throws DBALException
+     */
     public function __construct(array $params, FMDriver $driver)
     {
         $this->params = $params;
@@ -104,7 +115,13 @@ class FMConnection extends AbstractConnection
         return $this->transactionOpen;
     }
 
-
+    /**
+     * @param null $name
+     *
+     * @return string
+     *
+     * @throws FMException
+     */
     public function lastInsertId($name = null)
     {
         $this->statement->performCommand();
@@ -113,13 +130,19 @@ class FMConnection extends AbstractConnection
         return $this->statement->extractID();
     }
 
+    /**
+     * At present it's not possible to get metadata from the Data API
+     * so for now this is hard coded.
+     *
+     * @return string
+     */
     public function getServerVersion()
     {
-        return $this->connection->getAPIVersion();
+        return 'FMS Data API v1';
     }
 
     /**
-     * @return FileMaker
+     * @return
      */
     public function getConnection()
     {
@@ -157,6 +180,7 @@ class FMConnection extends AbstractConnection
 
             return isset($content['response']['data']) ? $content['response']['data'] : $content['response'];
         } catch (\Exception $e) {
+            /** @var ClientException $e */
             $content = json_decode($e->getResponse()->getBody()->getContents());
             if(401 == $content->messages[0]->code) {
                 // no records found
@@ -167,15 +191,21 @@ class FMConnection extends AbstractConnection
             // but sometimes you get 105 missing layout (go figure), so try a token refresh
             if(in_array($content->messages[0]->code, [105, 952]) && !$this->retried) {
                 $this->retried = true;
-                $this->forceTokenRefresh($this->params);
+                $this->forceTokenRefresh();
                 return $this->performFMRequest($method, $uri, $options);
 
             }
             throw new FMException($content->messages[0]->message, $content->messages[0]->code);
+        } catch(GuzzleException $e) {
+            throw new AuthenticationException('Unknown error', -1);
         }
     }
 
-    private function setBaseURL($host, $database)
+    /**
+     * @param string $host
+     * @param string $database
+     */
+    private function setBaseURL(string $host, string $database)
     {
         $this->baseURI =
             ('http' == substr($host, 4) ? $host : 'https://' . $host) .
@@ -184,6 +214,11 @@ class FMConnection extends AbstractConnection
             $database . '/';
     }
 
+    /**
+     * @param array $params
+     *
+     * @throws AuthenticationException
+     */
     private function fetchToken(array $params)
     {
         if($token = $this->readTokenFromDisk()) {
@@ -213,10 +248,17 @@ class FMConnection extends AbstractConnection
 
             $content = json_decode($e->getResponse()->getBody()->getContents());
             throw new AuthenticationException($content->messages[0]->message, $content->messages[0]->code);
+        } catch(GuzzleException $e) {
+            throw new AuthenticationException('Unknown error', -1);
         }
     }
 
-    private function forceTokenRefresh($params)
+    /**
+     * @param $params
+     *
+     * @throws AuthenticationException
+     */
+    private function forceTokenRefresh()
     {
         $path = $this->getTokenDiskLocation();
         unlink($path);
@@ -224,6 +266,9 @@ class FMConnection extends AbstractConnection
         $this->fetchToken($this->params);
     }
 
+    /**
+     * @return boolean|string
+     */
     private function readTokenFromDisk()
     {
         $path = $this->getTokenDiskLocation();
@@ -234,12 +279,20 @@ class FMConnection extends AbstractConnection
         return file_get_contents($path);
     }
 
+    /**
+     * Write the Data API token to disk for later access
+     */
     private function writeTokenToDisk()
     {
         $path = $this->getTokenDiskLocation();
         file_put_contents($path, $this->token);
     }
 
+    /**
+     * Determine where to save the Data API token
+     *
+     * @return string
+     */
     private function getTokenDiskLocation()
     {
         return sys_get_temp_dir().'fmp-token.txt';

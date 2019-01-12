@@ -12,8 +12,7 @@ use Doctrine\DBAL\Connection;
 use MSDev\DoctrineFMDataAPIDriver\Exception\FMException;
 use MSDev\DoctrineFMDataAPIDriver\FMConnection;
 use GuzzleHttp\Client;
-use \FileMaker;
-use \FileMaker_Error;
+
 
 class ContainerAccess
 {
@@ -24,34 +23,23 @@ class ContainerAccess
     protected $con;
 
     /**
-     * @var FileMaker
-     */
-    protected $fm;
-
-    /**
      * @var ScriptAccess
      */
     protected $script;
 
     public function __construct(Connection $conn, ScriptAccess $script)
     {
-        /** @var FMConnection $fmcon */
         $this->con = $conn->getWrappedConnection();
-        $this->fm = $this->con->getConnection();
-
         $this->script = $script;
     }
 
-
-
     /**
-     * The command to extract externally stored document of conatainer field
+     * Retrieve externally stored container content
      *
-     * This function only works for containers using externally stored data,
-     * if the conrtainer content is embeded, see below
+     * @param string $path
      *
-     * @param string $path	            - the URL path to the container
-     * @return string $containerData	- return the conatainer data
+     * @return string
+     *
      * @throws FMException
      */
     public function getExternalContainerContent($path) {
@@ -67,38 +55,6 @@ class ContainerAccess
     }
 
     /**
-     * The command to extract internally stored document of conatainer field
-     *
-     * This function only works for non-external containers (i.e content embeded in a
-     * container within the FM database.
-     *
-     * @param string $containerURL	    The FM URL for the container data
-     * @return string $containerData    The container content
-     * @throws FMException
-     *
-     */
-    public function getContainerContent($containerURL)
-    {
-        if(empty($containerURL)) {
-            throw new FMException("No container path specified");
-        }
-
-        $containerData = $this->fm->getContainerData($containerURL);
-
-        if($this->con->isError($containerData)) {
-            /** @var $containerData FileMaker_Error */
-            throw new FMException($containerData->message, $containerData->code);
-        }
-
-        if(empty($containerData)) {
-            throw new FMException("The container is empty");
-        }
-
-        return $containerData;
-    }
-
-
-    /**
      * Calls a FileMaker script to insert content into a container
      *
      * @param string $layout        The FM layout which the field to insert into is on
@@ -107,22 +63,22 @@ class ContainerAccess
      * @param string $field         The name of the field
      * @param string $assetPath     A URL which the asset can be retrieved from
      *                              This either needs to be publically accessible, or include
-     *                              the necesary credentials to access the asset using the
+     *                              the necessary credentials to access the asset using the
      *                              FileMaker InsertFromURL script step
      * @throws FMException
      *
      */
     public function insertIntoContainer($layout, $idField, $uuid, $field, $assetPath)
     {
-        $data = [
+        $data = json_encode([
             'idField' => $idField,
             'uuid' => $uuid,
             'field' => $field,
             'asset' => $assetPath,
-        ];
+        ]);
 
         try {
-            $this->script->performScript($layout, 'ImportToContainer', json_encode($data));
+            $this->script->performScript($layout, $uuid,'ImportToContainer', $data);
         } catch(\Exception $e) {
             throw new FMException($e->getMessage(), $e->getCode());
         }

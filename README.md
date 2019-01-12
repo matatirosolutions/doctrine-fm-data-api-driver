@@ -1,6 +1,6 @@
 # Doctrine FileMaker Data API driver #
 
-A Doctrine driver to interact with FileMaker using the v17+ Data API.
+A Doctrine driver to interact with FileMaker using the v17+ Data API v1.
 
 ## Installation ##
 
@@ -89,4 +89,4 @@ and replace it with
  
 ## See also ##
  
-This driver has been developed for use within Symfony applications (because that's what we do). The [Doctrine FileMaker bundle](https://github.com/matatirosolutions/doctrine-filemaker-driver-bundle "Doctrine FileMaker bundle") includes this driver as well as creating services to access scripts, containers, valuelists and more. 
+This driver has been developed for use within Symfony applications (because that's what we do). The [Doctrine FileMaker bundle](https://github.com/matatirosolutions/doctrine-filemaker-driver-bundle "Doctrine FileMaker bundle") creates services to access scripts, containers, etc. 

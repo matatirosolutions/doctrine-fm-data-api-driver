@@ -21,7 +21,7 @@ namespace MSDev\DoctrineFMDataAPIDriver;
 
 use Doctrine\DBAL\Driver;
 use Doctrine\DBAL\Connection;
-use MSDev\DoctrineFMDataAPIDriver\Exception\MethodNotSupportedExcpetion;
+use MSDev\DoctrineFMDataAPIDriver\Exception\MethodNotSupportedException;
 
 /**
  * FileMaker PHP API Driver.
@@ -31,7 +31,16 @@ use MSDev\DoctrineFMDataAPIDriver\Exception\MethodNotSupportedExcpetion;
 class FMDriver implements Driver
 {
     /**
-     * {@inheritdoc}
+     * @param array $params
+     * @param null $username
+     * @param null $password
+     * @param array $driverOptions
+     *
+     * @return FMConnection
+     *
+     * @throws Exception\AuthenticationException
+     * @throws \Doctrine\DBAL\DBALException
+     * @throws \GuzzleHttp\Exception\GuzzleException
      */
     public function connect(array $params, $username = null, $password = null, array $driverOptions = array())
     {
@@ -66,10 +75,10 @@ class FMDriver implements Driver
 
     /**
      * {@inheritdoc}
-     * @throws MethodNotSupportedExcpetion
+     * @throws MethodNotSupportedException
      */
     public function getSchemaManager(Connection $conn)
     {
-        throw new MethodNotSupportedExcpetion('code-based schema changes');
+        throw new MethodNotSupportedException('code-based schema changes');
     }
 }

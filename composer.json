@@ -3,35 +3,38 @@
   "description": "Use FileMaker via the v17+ Data API as your backend database",
   "type": "library",
   "authors": [
-      {
-          "name": "Steve Winter",
-          "email": "steve@msdev.co.uk"
-      }
+    {
+      "name": "Steve Winter",
+      "email": "steve@msdev.co.uk"
+    }
   ],
   "keywords": [
-      "doctrine", "dbal", "FileMaker"
+    "doctrine",
+    "dbal",
+    "FileMaker"
   ],
   "license": [
-      "MIT"
+    "MIT"
   ],
   "require-dev": {
-      "phpunit/phpunit" : "@stable",
-      "symfony/yaml": "3.*",
-      "sensio/framework-extra-bundle": "3.*",
-      "symfony/framework-bundle": "3.*",
-      "doctrine/doctrine-bundle": "^1.6",
-      "symfony/validator": "3.*"
+    "phpunit/phpunit": "@stable",
+    "symfony/yaml": "3.*",
+    "sensio/framework-extra-bundle": "3.*",
+    "symfony/framework-bundle": "3.*",
+    "doctrine/doctrine-bundle": "^1.6",
+    "symfony/validator": "3.*"
   },
   "autoload": {
-      "psr-4": {
-          "MSDev\\DoctrineFMDataAPIDriver\\": ""
-      }
+    "psr-4": {
+      "MSDev\\DoctrineFMDataAPIDriver\\": ""
+    }
   },
   "require": {
-      "php": ">=7.0.0",
-      "doctrine/dbal": "2.*",
-      "doctrine/orm": "2.*",
-      "greenlion/php-sql-parser": "^4.0",
-      "guzzlehttp/guzzle" : "^6.3"
+    "php": ">=7.0.0",
+    "ext-json": "*",
+    "doctrine/dbal": "2.*",
+    "doctrine/orm": "2.*",
+    "greenlion/php-sql-parser": "^4.0",
+    "guzzlehttp/guzzle": "^6.3"
   }
 }

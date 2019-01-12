@@ -10,6 +10,7 @@ namespace MSDev\DoctrineFMDataAPIDriver\Types;
 
 use Doctrine\DBAL\Platforms\AbstractPlatform;
 use Doctrine\DBAL\Types\Type;
+use Doctrine\DBAL\Types\ConversionException;
 
 /**
  *
@@ -33,7 +34,11 @@ class FMArrayType extends Type
     }
 
     /**
-     * {@inheritdoc}
+     * @param mixed $value
+     * @param AbstractPlatform $platform
+     * @return mixed|null
+     *
+     * @throws ConversionException
      */
     public function convertToPHPValue($value, AbstractPlatform $platform)
     {

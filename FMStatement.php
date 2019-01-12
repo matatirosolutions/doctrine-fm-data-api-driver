@@ -24,7 +24,7 @@ use MSDev\DoctrineFMDataAPIDriver\Utility\MetaData;
 use PHPSQLParser\PHPSQLParser;
 use MSDev\DoctrineFMDataAPIDriver\Utility\QueryBuilder;
 use MSDev\DoctrineFMDataAPIDriver\Exception\FMException;
-use MSDev\DoctrineFMDataAPIDriver\Exception\MethodNotSupportedExcpetion;
+use MSDev\DoctrineFMDataAPIDriver\Exception\MethodNotSupportedException;
 
 class FMStatement implements \IteratorAggregate, Statement
 {
@@ -245,7 +245,7 @@ class FMStatement implements \IteratorAggregate, Statement
             case \PDO::FETCH_ASSOC:
                 return count($this->records) === 0 ? false : $this->recordToArray(array_shift($this->records));
             default:
-                throw new MethodNotSupportedExcpetion($fetchMode);
+                throw new MethodNotSupportedException($fetchMode);
         }
     }
 
