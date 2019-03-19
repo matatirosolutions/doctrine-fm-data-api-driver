@@ -260,8 +260,8 @@ class FMConnection extends AbstractConnection
      */
     private function forceTokenRefresh()
     {
-        $path = $this->getTokenDiskLocation();
-        unlink($path);
+        $file = $this->getTokenDiskLocation();
+        unlink($file);
 
         $this->fetchToken($this->params);
     }
@@ -271,12 +271,12 @@ class FMConnection extends AbstractConnection
      */
     private function readTokenFromDisk()
     {
-        $path = $this->getTokenDiskLocation();
-        if(!file_exists($path)) {
+        $file = $this->getTokenDiskLocation();
+        if(!file_exists($file)) {
             return false;
         }
 
-        return file_get_contents($path);
+        return file_get_contents($file);
     }
 
     /**
@@ -284,8 +284,8 @@ class FMConnection extends AbstractConnection
      */
     private function writeTokenToDisk()
     {
-        $path = $this->getTokenDiskLocation();
-        file_put_contents($path, $this->token);
+        $file = $this->getTokenDiskLocation();
+        file_put_contents($file, $this->token);
     }
 
     /**
@@ -295,6 +295,6 @@ class FMConnection extends AbstractConnection
      */
     private function getTokenDiskLocation()
     {
-        return sys_get_temp_dir().'fmp-token.txt';
+        return sys_get_temp_dir().DIRECTORY_SEPARATOR.'fmp-token.txt';
     }
 }
