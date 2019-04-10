@@ -261,7 +261,7 @@ class FMConnection extends AbstractConnection
     private function forceTokenRefresh()
     {
         $file = $this->getTokenDiskLocation();
-        unlink($file);
+        file_put_contents($file, '');
 
         $this->fetchToken($this->params);
     }
@@ -276,7 +276,12 @@ class FMConnection extends AbstractConnection
             return false;
         }
 
-        return file_get_contents($file);
+        $content = file_get_contents($file);
+        if(empty($content)) {
+            return false;
+        }
+
+        return $content;
     }
 
     /**
