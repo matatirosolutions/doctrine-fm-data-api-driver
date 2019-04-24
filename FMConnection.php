@@ -155,6 +155,24 @@ class FMConnection extends AbstractConnection
     }
 
     /**
+     * @return string
+     */
+    public function getToken()
+    {
+        return $this->token;
+    }
+
+    /**
+     * @return string
+     */
+    public function getBaseURI()
+    {
+        return $this->baseURI;
+    }
+
+
+
+    /**
      * @param $method
      * @param $uri
      * @param $options
