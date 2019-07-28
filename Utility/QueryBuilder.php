@@ -194,7 +194,7 @@ class QueryBuilder
         $this->options = [
             'body' => json_encode([
                 'fieldData' => $data,
-            ])
+            ], JSON_FORCE_OBJECT)
         ];
     }
 
