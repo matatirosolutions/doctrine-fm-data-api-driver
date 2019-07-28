@@ -55,6 +55,24 @@ class ContainerAccess
     }
 
     /**
+     * Retrieve DataAPI streamed content
+     *
+     * @param $url
+     * @return string
+     *
+     * @throws FMException
+     */
+    public function getStreamedContainerContent($url) {
+        $client = new Client(['cookies' => true]);
+        try {
+            $response = $client->get($url);
+            return $response->getBody()->getContents();
+        } catch (\Exception $e) {
+            throw new FMException($e->getMessage(), $e->getCode());
+        }
+    }
+
+    /**
      * Calls a FileMaker script to insert content into a container
      *
      * @param string $layout        The FM layout which the field to insert into is on
@@ -79,6 +97,39 @@ class ContainerAccess
 
         try {
             $this->script->performScript($layout, $uuid,'ImportToContainer', $data);
+        } catch(\Exception $e) {
+            throw new FMException($e->getMessage(), $e->getCode());
+        }
+    }
+
+    /**
+     * @param string $layout
+     * @param int $recId
+     * @param $field
+     * @param $file
+     * @param int $repetition
+     *
+     * @return array
+     *
+     * @throws FMException
+     */
+    public function performContainerInsert($layout, $recId, $field, $file, $repetition = 1)
+    {
+        $uri = sprintf('layouts/%s/records/%s/containers/%s/%s', $layout, $recId, $field, $repetition);
+        $options = [
+            'headers' => [
+                'Authorization' => sprintf('Bearer %s', $this->con->getToken()),
+            ],
+            'multipart' => [
+                [
+                    'name'     => 'upload',
+                    'contents' => fopen($file, 'r')
+                ],
+            ]
+        ];
+
+        try {
+            return $this->con->performFMRequest('POST', $uri, $options);
         } catch(\Exception $e) {
             throw new FMException($e->getMessage(), $e->getCode());
         }

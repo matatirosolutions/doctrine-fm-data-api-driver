@@ -98,6 +98,12 @@ class QueryBuilder
             if(array_key_exists('ORDER', $this->query)) {
                 $this->uri .= '?_sort='.json_encode($this->getSort());
             }
+
+            if(isset($tokens['FROM'][0]['expr_type']) && 'subquery' == $tokens['FROM'][0]['expr_type']) {
+                $this->uri .= '&_offset=' . $this->getSkip($tokens);
+                $this->uri .= '&_limit=' . $this->getMax($tokens);
+            }
+
             return;
         }
 
