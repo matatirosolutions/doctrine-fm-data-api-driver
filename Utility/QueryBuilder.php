@@ -95,14 +95,21 @@ class QueryBuilder
             $this->method = 'GET';
             $this->uri = sprintf('layouts/%s/records', $layout);
 
+            $prefix = '?';
             if(array_key_exists('ORDER', $this->query)) {
                 $this->uri .= '?_sort='.json_encode($this->getSort());
+                $prefix= '&';
             }
 
+            // If we don't set a (crazy) high default limit then findAll() doesn't really work
+            // as the FM Data API only returns 100 records by default
+            $offset = 1;
+            $limit = 10000;
             if(isset($tokens['FROM'][0]['expr_type']) && 'subquery' == $tokens['FROM'][0]['expr_type']) {
-                $this->uri .= '&_offset=' . $this->getSkip($tokens);
-                $this->uri .= '&_limit=' . $this->getMax($tokens);
+                $offset = $this->getSkip($tokens);
+                $limit = $this->getMax($tokens);
             }
+            $this->uri .= sprintf( '%s_offset=%s&_limit=%s', $prefix, $offset, $limit);
 
             return;
         }
