@@ -155,7 +155,7 @@ class QueryBuilder
             $details = explode('=', $up);
             $field = trim(str_replace("'", '', array_shift($details)));
             if($field) {
-                $data[$field] = $params[$count];
+                $data[$field] = is_null($params[$count]) ? "" : $params[$count];
                 $count++;
             }
         }
@@ -173,7 +173,8 @@ class QueryBuilder
         $layout = $this->getLayout($tokens);
         $recID = $this->getRecordID($tokens, $layout);
 
-        return $this->fmp->newDeleteCommand($layout, $recID);
+        $this->method = 'DELETE';
+        $this->uri = sprintf('layouts/%s/records/%s', $layout, $recID);
     }
 
 
@@ -194,7 +195,7 @@ class QueryBuilder
             if('rec_id' === $field || 'rec_meta' === $field || ($idColumn === $field && empty($params[$c+1]))) {
                 continue;
             }
-            $data[$field] = $params[$c+1];
+            $data[$field] = is_null($params[$c+1]) ? "" : $params[$c+1];
         }
 
         $this->options = [

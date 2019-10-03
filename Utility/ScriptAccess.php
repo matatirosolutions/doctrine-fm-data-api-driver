@@ -44,7 +44,12 @@ class ScriptAccess
     {
         $uri = sprintf('/layouts/%s/records/%s?script=%s&script.param=%s', $layout, $recId, $script, $param);
         try {
-            return $this->conn->performFMRequest('GET', $uri, []);
+            $this->conn->performFMRequest('GET', $uri, []);
+
+            $uri = sprintf('/layouts/%s/records/%s', $layout, $recId);
+            $record = $this->conn->performFMRequest('GET', $uri, []);
+
+            return $record[0]['fieldData'];
         } catch(\Exception $e) {
             throw new FMException($e->getMessage(), $e->getCode());
         }
