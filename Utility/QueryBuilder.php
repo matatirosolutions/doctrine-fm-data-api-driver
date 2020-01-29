@@ -199,7 +199,7 @@ class QueryBuilder
         $data = [];
         foreach($fields as $c => $f) {
             $field = trim($f);
-            if('rec_id' === $field || 'rec_meta' === $field || ($idColumn === $field && empty($params[$c+1]))) {
+            if('rec_id' === $field || 'mod_id' === $field || 'rec_meta' === $field || ($idColumn === $field && empty($params[$c+1]))) {
                 continue;
             }
             $data[$field] = is_null($params[$c+1]) ? "" : $params[$c+1];
