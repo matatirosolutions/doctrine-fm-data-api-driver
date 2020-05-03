@@ -1,32 +1,24 @@
 <?php
-/*
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
- * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
- * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
- * OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
- * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
- * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
- * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
- * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * This software consists of voluntary contributions made by many individuals
- * and is licensed under the MIT license. For more information, see
- * <http://www.doctrine-project.org>.
- */
+
 
 namespace MSDev\DoctrineFMDataAPIDriver;
 
+
+use ArrayIterator;
 use Doctrine\DBAL\Driver\Statement;
-use MSDev\DoctrineFMDataAPIDriver\Utility\MetaData;
-use PHPSQLParser\PHPSQLParser;
-use MSDev\DoctrineFMDataAPIDriver\Utility\QueryBuilder;
+use Exception;
+use IteratorAggregate;
+use MSDev\DoctrineFMDataAPIDriver\Exception\AuthenticationException;
 use MSDev\DoctrineFMDataAPIDriver\Exception\FMException;
 use MSDev\DoctrineFMDataAPIDriver\Exception\MethodNotSupportedException;
+use MSDev\DoctrineFMDataAPIDriver\Exception\NotImplementedException;
+use MSDev\DoctrineFMDataAPIDriver\Utility\MetaData;
+use MSDev\DoctrineFMDataAPIDriver\Utility\QueryBuilder;
+use PDO;
+use PHPSQLParser\PHPSQLParser;
 
-class FMStatement implements \IteratorAggregate, Statement
+
+class FMStatement implements IteratorAggregate, Statement
 {
     /** @var int */
     public $id;
@@ -34,7 +26,7 @@ class FMStatement implements \IteratorAggregate, Statement
     /**
      * @var resource
      */
-    private $_stmt = null;
+    private $_stmt;
 
     /**
      * @var array
@@ -54,7 +46,7 @@ class FMStatement implements \IteratorAggregate, Statement
     /**
      * @var integer
      */
-    private $_defaultFetchMode = \PDO::FETCH_BOTH;
+    private $_defaultFetchMode = PDO::FETCH_BOTH;
 
     /**
      * The query which has been parsed from the SQL by PHPSQLParser
@@ -64,7 +56,7 @@ class FMStatement implements \IteratorAggregate, Statement
     private $request;
 
     /**
-     * Hold the response from FileMaker be it a result object or and error object
+     * Hold the response from FileMaker be it a result object or an error object
      *
      * @var array
      */
@@ -185,6 +177,7 @@ class FMStatement implements \IteratorAggregate, Statement
 
     /**
      * {@inheritdoc}
+     * @throws NotImplementedException|AuthenticationException|FMException
      */
     public function execute($params = null)
     {
@@ -201,6 +194,9 @@ class FMStatement implements \IteratorAggregate, Statement
         }
     }
 
+    /**
+     * @throws AuthenticationException|FMException
+     */
     public function performCommand()
     {
         $this->records = $this->conn->performFMRequest($this->qb->getMethod(), $this->qb->getUri(), $this->qb->getOptions());
@@ -227,13 +223,14 @@ class FMStatement implements \IteratorAggregate, Statement
     {
         $data = $this->fetchAll();
 
-        return new \ArrayIterator($data);
+        return new ArrayIterator($data);
     }
 
     /**
      * {@inheritdoc}
+     * @throws MethodNotSupportedException
      */
-    public function fetch($fetchMode = null, $cursorOrientation = \PDO::FETCH_ORI_NEXT, $cursorOffset = 0)
+    public function fetch($fetchMode = null, $cursorOrientation = PDO::FETCH_ORI_NEXT, $cursorOffset = 0)
     {
         // do not try fetching from the statement if it's not expected to contain a result
         if (!$this->result) {
@@ -242,7 +239,7 @@ class FMStatement implements \IteratorAggregate, Statement
 
         $fetchMode = $fetchMode ?: $this->_defaultFetchMode;
         switch ($fetchMode) {
-            case \PDO::FETCH_ASSOC:
+            case PDO::FETCH_ASSOC:
                 return count($this->records) === 0 ? false : $this->recordToArray(array_shift($this->records));
             default:
                 throw new MethodNotSupportedException($fetchMode);
@@ -251,18 +248,19 @@ class FMStatement implements \IteratorAggregate, Statement
 
     /**
      * {@inheritdoc}
+     * @throws MethodNotSupportedException
      */
     public function fetchAll($fetchMode = null, $fetchArgument = NULL, $ctorArgs = NULL)
     {
         $rows = array();
 
         switch ($fetchMode) {
-            case \PDO::FETCH_CLASS:
+            case PDO::FETCH_CLASS:
                 while ($row = call_user_func_array(array($this, 'fetch'), func_get_args())) {
                     $rows[] = $row;
                 }
                 break;
-            case \PDO::FETCH_COLUMN:
+            case PDO::FETCH_COLUMN:
                 while ($row = $this->fetchColumn()) {
                     $rows[] = $row;
                 }
@@ -278,10 +276,11 @@ class FMStatement implements \IteratorAggregate, Statement
 
     /**
      * {@inheritdoc}
+     * @throws MethodNotSupportedException
      */
     public function fetchColumn($columnIndex = 0)
     {
-        $row = $this->fetch(\PDO::FETCH_NUM);
+        $row = $this->fetch(PDO::FETCH_NUM);
 
         if (false === $row) {
             return false;
@@ -357,8 +356,9 @@ class FMStatement implements \IteratorAggregate, Statement
      * Find the name of the ID column and return that value from the first record
      *
      * @return string
+     * @throws FMException
      */
-    public function extractID()
+    public function extractID(): string
     {
         $idColumn = $this->qb->getIdColumn($this->request, new MetaData());
         if('rec_id' == $idColumn) {
@@ -369,7 +369,7 @@ class FMStatement implements \IteratorAggregate, Statement
         try {
             $record = $this->conn->performFMRequest('GET', $uri, $this->qb->getOptions());
             return $record[0]['fieldData'][$idColumn];
-        } catch(\Exception $e) {
+        } catch(Exception $e) {
             throw new FMException('Unable to locate record primary key with error '. $e->getMessage());
         }
 
@@ -379,15 +379,15 @@ class FMStatement implements \IteratorAggregate, Statement
      * Extract query metadata from the returned response - not currently supported by the
      * DataAPI - hopefully in FMS 18
      *
-     * @return array
+     * @return string
      */
-    private function getMetadataArray()
+    private function getMetadataArray(): string
     {
+        $meta = $this->conn->getMetadata();
         return json_encode([
-            'found' => 0,
-            'fetch' => 0,
-            'total' => 0,
+            'found' => $meta['foundCount'] ?? 0,
+            'fetch' => $meta['returnedCount'] ?? 0,
+            'total' => $meta['totalRecordCount'] ?? 0,
         ]);
     }
-
 }

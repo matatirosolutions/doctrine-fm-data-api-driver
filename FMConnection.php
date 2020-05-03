@@ -1,49 +1,47 @@
 <?php
-/**
- * Created by PhpStorm.
- * User: SteveWinter
- * Date: 17/02/2017
- * Time: 16:42
- */
+
 
 namespace MSDev\DoctrineFMDataAPIDriver;
 
+
 use Doctrine\DBAL\Connection as AbstractConnection;
 use Doctrine\DBAL\DBALException;
+use Exception;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\ClientException;
 use GuzzleHttp\Exception\GuzzleException;
 use MSDev\DoctrineFMDataAPIDriver\Exception\FMException;
 use MSDev\DoctrineFMDataAPIDriver\Exception\AuthenticationException;
+use MSDev\DoctrineFMDataAPIDriver\Exception\NotImplementedException;
 
 class FMConnection extends AbstractConnection
 {
-
-    /**
-     * @var
-     */
+    /** @var */
     private $connection = null;
 
-    /**
-     * @var FMStatement
-     */
+    /** @var FMStatement */
     private $statement = null;
 
-    /**
-     * @var bool
-     */
+    /** @var bool */
     private $transactionOpen = false;
 
-    /**
-     * @var array
-     */
+    /** @var array */
     protected $params;
 
+    /** @var string */
     protected $baseURI;
+
+    /** @var string */
     protected $token;
+
+    /** @var bool */
     protected $retried = false;
 
+    /** @var array  */
     public $queryStack = [];
+
+    /** @var array|null */
+    public $metadata;
 
     /**
      * FMConnection constructor.
@@ -84,6 +82,7 @@ class FMConnection extends AbstractConnection
 
     /**
      * {@inheritdoc}
+     * @throws NotImplementedException|AuthenticationException|FMException
      */
     public function query()
     {
@@ -96,6 +95,11 @@ class FMConnection extends AbstractConnection
         return $stmt;
     }
 
+    /**
+     * @return bool
+     *
+     * @throws AuthenticationException|FMException
+     */
     public function commit()
     {
         /** @var FMStatement $stmt */
@@ -120,7 +124,7 @@ class FMConnection extends AbstractConnection
      *
      * @return string
      *
-     * @throws FMException
+     * @throws FMException|AuthenticationException
      */
     public function lastInsertId($name = null)
     {
@@ -170,19 +174,17 @@ class FMConnection extends AbstractConnection
         return $this->baseURI;
     }
 
-
-
     /**
-     * @param $method
-     * @param $uri
-     * @param $options
+     * @param string $method
+     * @param string $uri
+     * @param array $options
      *
      * @return array
      *
      * @throws AuthenticationException
      * @throws FMException
      */
-    public function performFMRequest($method, $uri, $options)
+    public function performFMRequest(string $method, string $uri, array $options): array
     {
         $client = new Client();
         $headers = [
@@ -195,9 +197,10 @@ class FMConnection extends AbstractConnection
         try {
             $response = $client->request($method, $this->baseURI.$uri, array_merge($headers, $options));
             $content = json_decode($response->getBody()->getContents(), true);
+            $this->metadata = $content['response']['dataInfo'] ?? null;
 
             return isset($content['response']['data']) ? $content['response']['data'] : $content['response'];
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             /** @var ClientException $e */
             $content = json_decode($e->getResponse()->getBody()->getContents());
             if(401 == $content->messages[0]->code) {
@@ -233,6 +236,14 @@ class FMConnection extends AbstractConnection
     }
 
     /**
+     * @return array|null
+     */
+    public function getMetadata(): ?array
+    {
+        return $this->metadata;
+    }
+
+    /**
      * @param array $params
      *
      * @throws AuthenticationException
@@ -258,7 +269,7 @@ class FMConnection extends AbstractConnection
             $content = json_decode($response->getBody()->getContents());
             $this->token = $content->response->token;
             $this->writeTokenToDisk();
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             /** @var ClientException $e */
             if(404 == $e->getResponse()->getStatusCode()) {
                 throw new AuthenticationException($e->getResponse()->getReasonPhrase(), $e->getResponse()->getStatusCode());
@@ -272,8 +283,6 @@ class FMConnection extends AbstractConnection
     }
 
     /**
-     * @param $params
-     *
      * @throws AuthenticationException
      */
     private function forceTokenRefresh()
