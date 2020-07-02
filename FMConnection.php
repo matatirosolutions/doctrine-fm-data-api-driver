@@ -199,6 +199,10 @@ class FMConnection extends AbstractConnection
             return isset($content['response']['data']) ? $content['response']['data'] : $content['response'];
         } catch (\Exception $e) {
             /** @var ClientException $e */
+            if(null === $e->getResponse()) {
+                throw new FMException($e->getMessage(), $e->getCode(), $e);
+            }
+
             $content = json_decode($e->getResponse()->getBody()->getContents());
             if(401 == $content->messages[0]->code) {
                 // no records found
