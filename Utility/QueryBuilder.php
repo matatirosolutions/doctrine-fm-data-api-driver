@@ -275,7 +275,6 @@ class QueryBuilder
     {
         $request = [];
         $cols = $this->selectColumns($this->query);
-        //$cmd = $this->fmp->newFindCommand($layout);
         $pc = 1;
 
         for($c = 0; $c<count($this->query['WHERE']); $c++) {
@@ -304,7 +303,6 @@ class QueryBuilder
             if(isset($column['sub_tree'])) {
                 $field = [];
                 foreach($column['sub_tree'] as $sub) {
-                    //$parts =
                     $field[] = end($sub['no_quotes']['parts']);
                 }
                 $cols[$column['base_expr']] = implode(' ', $field);

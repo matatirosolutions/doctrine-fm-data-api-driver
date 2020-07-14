@@ -181,9 +181,7 @@ class FMStatement implements IteratorAggregate, Statement
      */
     public function execute($params = null)
     {
-        $query = $this->populateParams($this->_stmt, $this->_bindParam);
-        $this->request = $this->sqlParser->parse($query);
-
+        $this->setRequest();
         $this->id = Uniqid('', true).mt_rand(999, 999999);
         $this->qb->getQueryFromRequest($this->request, $this->_stmt, $this->_bindParam);
 
@@ -297,6 +295,17 @@ class FMStatement implements IteratorAggregate, Statement
         return $this->numRows;
     }
 
+    private function setRequest()
+    {
+        $query = $this->populateParams($this->_stmt, $this->_bindParam);
+        $tokens = $this->sqlParser->parse($query);
+
+        if('select' === strtolower(array_keys($tokens)[0])) {
+            $tokens = $this->sqlParser->parse($this->_stmt);
+        }
+        $this->request = $tokens;
+    }
+
     /**
      * Populate parameters, removing characters which will cause issues with later
      * query parsing
@@ -324,7 +333,6 @@ class FMStatement implements IteratorAggregate, Statement
      */
     private function recordToArray(array $rec)
     {
-
         $select = $this->request['SELECT'];
         if('subquery' == $this->request['FROM'][0]['expr_type']) {
             $select = $this->request['FROM'][0]['sub_tree']['FROM'][0]['sub_tree']['SELECT'];
