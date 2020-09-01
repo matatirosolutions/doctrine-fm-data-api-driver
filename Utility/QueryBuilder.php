@@ -146,10 +146,9 @@ class QueryBuilder
      */
     private function generateUpdateCommand($tokens, $statement, $params)
     {
-        $layout = $this->getLayout($tokens);
-        $recID = $this->getRecordID($tokens, $layout);
-
         $this->method = 'PATCH';
+        $layout = $this->getLayout($tokens);
+        $recID = $this->getRecordID($tokens, $layout, $params);
         $this->uri = sprintf('layouts/%s/records/%s', $layout, $recID);
 
         $data = $matches = [];
@@ -157,7 +156,6 @@ class QueryBuilder
 
         preg_match('/ SET (.*) WHERE /', $statement, $matches);
         $pairs = explode(',', $matches[1]);
-
         foreach($pairs as $up) {
             $details = explode('=', $up);
             $field = trim(str_replace("'", '', array_shift($details)));
@@ -175,12 +173,12 @@ class QueryBuilder
     }
 
 
-    private function generateDeleteCommand($tokens)
+    private function generateDeleteCommand($tokens, $params)
     {
-        $layout = $this->getLayout($tokens);
-        $recID = $this->getRecordID($tokens, $layout);
-
         $this->method = 'DELETE';
+        $layout = $this->getLayout($tokens);
+        $recID = $this->getRecordID($tokens, $layout, $params);
+
         $this->uri = sprintf('layouts/%s/records/%s', $layout, $recID);
     }
 
@@ -219,12 +217,17 @@ class QueryBuilder
      * @return integer
      * @throws FMException
      */
-    private function getRecordID($tokens, $layout): int
+    private function getRecordID($tokens, $layout, $params): int
     {
-        $value = '';
-        for($i=2; $i<count($tokens['WHERE']); $i++) {
-            $value .= $tokens['WHERE'][$i]['base_expr'];
+        switch($this->method) {
+            case 'DELETE':
+                $value = $params[1];
+                break;
+            default:
+                $key = count($tokens['SET']) + 1;
+                $value = $params[$key];
         }
+
         $options = [
             'body' => json_encode([
                 'query' => [
@@ -397,7 +400,6 @@ class QueryBuilder
             // Explcitly here for clarity
             case 'LIKE':
                 return '';
-            // TODO don't know what to do with this yet!
             case '!=':
                 return '';
             // Anything else get's the standard FM find method
