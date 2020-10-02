@@ -80,7 +80,7 @@ class QueryBuilder
             case 'insert':
                 return $this->generateInsertCommand($tokens, $params);
             case 'delete':
-                return $this->generateDeleteCommand($tokens);
+                return $this->generateDeleteCommand($tokens, $params);
         }
 
         throw new NotImplementedException('Unknown request type');
@@ -117,7 +117,7 @@ class QueryBuilder
         $this->method = 'POST';
         $this->uri = sprintf('layouts/%s/_find', $layout);
         $body = [
-            'query' => $this->generateWhere($params, $layout)
+            'query' => $this->generateWhere($params)
         ];
 
         // Sort
