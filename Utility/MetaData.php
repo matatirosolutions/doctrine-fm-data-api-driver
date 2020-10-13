@@ -3,7 +3,7 @@
 
 namespace MSDev\DoctrineFMDataAPIDriver\Utility;
 
-use Doctrine\Common\Persistence\ObjectManager;
+use Doctrine\Persistence\ObjectManager;
 
 /**
  * Provider for doctrine metadata
