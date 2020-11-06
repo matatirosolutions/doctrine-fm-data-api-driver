@@ -214,28 +214,22 @@ class QueryBuilder
      * @param $tokens
      * @param $layout
      *
+     * @param $params
      * @return integer
      * @throws FMException
      */
     private function getRecordID($tokens, $layout, $params): int
     {
-        switch($this->method) {
-            case 'DELETE':
-                $value = $params[1];
-                break;
-            default:
-                $key = count($tokens['SET']) + 1;
-                $value = $params[$key];
-        }
-
+        $uri = sprintf('layouts/%s/_find', $layout);
+        $uuid = $params[count($params)];
         $options = [
             'body' => json_encode([
                 'query' => [
-                    [$tokens['WHERE'][0]['base_expr'] => $value]
+                    [$tokens['WHERE'][0]['base_expr'] => $uuid]
                 ]
             ])
         ];
-        $uri = sprintf('layouts/%s/_find', $layout);
+
         try {
             $record = $this->connetion->performFMRequest('POST', $uri, $options);
             return $record[0]['recordId'];
