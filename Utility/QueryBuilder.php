@@ -391,15 +391,15 @@ class QueryBuilder
                     return '';
                 }
                 return '==';
-            // Explcitly here for clarity
+            case '>':
+            case '<':
+                return $request;
+            // ExpliAdding greatercitly here for clarity
             case 'LIKE':
-                return '';
             case '!=':
-                return '';
-            // Anything else get's the standard FM find method
+            // Anything else gets the standard FM find method
             default:
                 return '';
-
         }
     }
 }
