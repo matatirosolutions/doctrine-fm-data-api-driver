@@ -274,12 +274,12 @@ class QueryBuilder
         $cols = $this->selectColumns($this->query);
         $pc = 1;
 
-        for($c = 0; $c<count($this->query['WHERE']); $c++) {
-            $query = $this->query['WHERE'][$c];
+        foreach ($this->query['WHERE'] as $c => $cValue) {
+            $query = $cValue;
 
             if(array_key_exists($query['base_expr'], $cols)) {
                 $op = $this->getOperator($this->query['WHERE'][$c+1]['base_expr'], $params[$pc]);
-                $request[$query['no_quotes']['parts'][1]] = $op.$params[$pc];
+                $request[$query['no_quotes']['parts'][1]] = $op.($params[$pc] === false ? 0 : $params[$pc]);
                 $pc++;
             }
         }
