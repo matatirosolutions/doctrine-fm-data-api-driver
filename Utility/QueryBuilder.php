@@ -225,7 +225,7 @@ class QueryBuilder
         $options = [
             'body' => json_encode([
                 'query' => [
-                    [$tokens['WHERE'][0]['base_expr'] => $uuid]
+                    [str_replace("'", '', $tokens['WHERE'][0]['base_expr']) => $uuid]
                 ]
             ])
         ];
