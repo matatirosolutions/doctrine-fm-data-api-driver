@@ -393,6 +393,10 @@ class QueryBuilder
                 return '==';
             case '>':
             case '<':
+            case '>=':
+            case '<=':
+            case '=<':
+            case '=>':
                 return $request;
             // ExpliAdding greatercitly here for clarity
             case 'LIKE':
