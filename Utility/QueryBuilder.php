@@ -355,7 +355,7 @@ class QueryBuilder
     {
         $skip = $this->getSkip($tokens);
         if(isset($tokens['WHERE'][6]['base_expr'])) {
-            return (int)$tokens['WHERE'][6]['base_expr'] - $skip;
+            return (int)$tokens['WHERE'][6]['base_expr'] - $skip + 1;
         }
 
         if(isset($tokens['WHERE'][1]['base_expr']) && '<=' == $tokens['WHERE'][1]['base_expr']) {
