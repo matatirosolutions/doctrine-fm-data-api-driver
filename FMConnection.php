@@ -184,7 +184,7 @@ class FMConnection extends AbstractConnection
      * @throws AuthenticationException
      * @throws FMException
      */
-    public function performFMRequest(string $method, string $uri, array $options): array
+    public function performFMRequest(string $method, string $uri, array $options, bool $returnScriptResult = false): array
     {
         $client = new Client();
         $headers = [
@@ -198,6 +198,13 @@ class FMConnection extends AbstractConnection
             $response = $client->request($method, $this->baseURI.$uri, array_merge($headers, $options));
             $content = json_decode($response->getBody()->getContents(), true);
             $this->metadata = $content['response']['dataInfo'] ?? null;
+
+            if($returnScriptResult) {
+                return [
+                    'error' => $content['response']['scriptError'],
+                    'result' => $content['response']['scriptResult']
+                ];
+            }
 
             return isset($content['response']['data']) ? $content['response']['data'] : $content['response'];
         } catch (Exception $e) {

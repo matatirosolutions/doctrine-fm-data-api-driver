@@ -40,11 +40,14 @@ class ScriptAccess
      *
      * @throws FMException
      */
-    public function performScript($layout, $recId, $script, $param = '')
+    public function performScript($layout, $recId, $script, $param = '', $returnScriptResult = false)
     {
         $uri = sprintf('/layouts/%s/records/%s?script=%s&script.param=%s', $layout, $recId, $script, $param);
         try {
-            $this->conn->performFMRequest('GET', $uri, []);
+            $scriptResult = $this->conn->performFMRequest('GET', $uri, [], $returnScriptResult);
+            if($returnScriptResult) {
+                return $scriptResult;
+            }
 
             $uri = sprintf('/layouts/%s/records/%s', $layout, $recId);
             $record = $this->conn->performFMRequest('GET', $uri, []);
