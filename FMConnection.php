@@ -202,7 +202,7 @@ class FMConnection extends AbstractConnection
             if($returnScriptResult) {
                 return [
                     'error' => $content['response']['scriptError'],
-                    'result' => $content['response']['scriptResult']
+                    'result' => $content['response']['scriptResult'] ?? '',
                 ];
             }
 
