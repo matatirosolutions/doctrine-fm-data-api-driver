@@ -5,7 +5,8 @@ A Doctrine driver to interact with FileMaker using the v17+ Data API v1.
 ## Installation ##
 
     composer require matatirosoln/doctrine-fm-data-api-driver
-        
+
+**Note**: We recently update the version of Guzzle used by this library to v7 which requires PHP >= 7.2. If you are still working with an earlier version of PHP then require version `^0.7.5` of this library.         
 ## Configuration ##
     
 In your Doctrine configuration comment out 
