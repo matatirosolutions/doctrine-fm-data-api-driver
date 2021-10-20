@@ -1,8 +1,6 @@
 <?php
 
-
 namespace MSDev\DoctrineFMDataAPIDriver;
-
 
 use Doctrine\DBAL\Connection as AbstractConnection;
 use Doctrine\DBAL\DBALException;
@@ -16,6 +14,8 @@ use MSDev\DoctrineFMDataAPIDriver\Exception\NotImplementedException;
 
 class FMConnection extends AbstractConnection
 {
+    private const SERVER_VERSION_CLOUD = 'FMCloud';
+
     /** @var */
     private $connection = null;
 
@@ -266,6 +266,11 @@ class FMConnection extends AbstractConnection
             return;
         }
 
+        if(isset($this->params['serverVersion']) && $this->params['serverVersion'] === self::SERVER_VERSION_CLOUD) {
+            $this->token = $this->fetchCloudToken();
+            return;
+        }
+
         $client = new Client();
         try {
             $response = $client->request('POST', $this->baseURI . 'sessions', [
@@ -292,6 +297,28 @@ class FMConnection extends AbstractConnection
             throw new AuthenticationException('Unknown error', -1);
         }
     }
+
+    private function fetchCloudToken(): string
+    {
+        if(!class_exists('\MSDev\FMCloudAuthenticator\Authenticate')) {
+            throw new AuthenticationException('You must include matatirosoln/fm-cloud-authentication when using FileMaker Cloud.', -1);
+        }
+
+        $credentials = new \MSDev\FMCloudAuthenticator\Credentials(
+            $this->params['host'],
+            $this->params['user'],
+            $this->params['password'],
+            \MSDev\FMCloudAuthenticator\Credentials::DAPI,
+            $this->params['dbname']
+        );
+
+        $authenticator = new \MSDev\FMCloudAuthenticator\Authenticate();
+        $token = $authenticator->fetchToken($credentials);
+        $this->writeTokenToDisk($token);
+
+        return $token;
+    }
+
 
     /**
      * @throws AuthenticationException
@@ -340,4 +367,5 @@ class FMConnection extends AbstractConnection
     {
         return sys_get_temp_dir().DIRECTORY_SEPARATOR.'fmp-token.txt';
     }
+
 }
