@@ -240,8 +240,8 @@ class FMConnection extends AbstractConnection
     private function setBaseURL(string $host, string $database)
     {
         $this->baseURI =
-            ('http' == substr($host, 4) ? $host : 'https://' . $host) .
-            ('/' == substr($host, -1) ? '' : '/') .
+            ('http' === substr($host, 4) ? $host : 'https://' . $host) .
+            ('/' === substr($host, -1) ? '' : '/') .
             'fmi/data/v1/databases/' .
             $database . '/';
     }
