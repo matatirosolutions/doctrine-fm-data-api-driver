@@ -267,7 +267,7 @@ class FMConnection extends AbstractConnection
         }
 
         if(isset($this->params['serverVersion']) && $this->params['serverVersion'] === self::SERVER_VERSION_CLOUD) {
-            $this->token = $this->fetchCloudToken();
+            $this->fetchCloudToken();
             return;
         }
 
@@ -298,7 +298,7 @@ class FMConnection extends AbstractConnection
         }
     }
 
-    private function fetchCloudToken(): string
+    private function fetchCloudToken(): void
     {
         if(!class_exists('\MSDev\FMCloudAuthenticator\Authenticate')) {
             throw new AuthenticationException('You must include matatirosoln/fm-cloud-authentication when using FileMaker Cloud.', -1);
@@ -313,10 +313,8 @@ class FMConnection extends AbstractConnection
         );
 
         $authenticator = new \MSDev\FMCloudAuthenticator\Authenticate();
-        $token = $authenticator->fetchToken($credentials);
-        $this->writeTokenToDisk($token);
-
-        return $token;
+        $this->token = $authenticator->fetchToken($credentials);
+        $this->writeTokenToDisk();
     }
 
 
