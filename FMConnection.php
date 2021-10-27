@@ -122,7 +122,7 @@ class FMConnection extends AbstractConnection
     /**
      * @param null $name
      *
-     * @return string
+     * @return string|int
      *
      * @throws FMException|AuthenticationException
      */
@@ -137,50 +137,23 @@ class FMConnection extends AbstractConnection
     /**
      * At present it's not possible to get metadata from the Data API
      * so for now this is hard coded.
-     *
-     * @return string
      */
-    public function getServerVersion()
+    public function getServerVersion(): string
     {
         return 'FMS Data API v1';
     }
 
-    /**
-     * @return
-     */
     public function getConnection()
     {
         return $this->connection;
     }
 
-    public function getParameters()
-    {
-        return $this->params;
-    }
-
-    /**
-     * @return string
-     */
-    public function getToken()
+    public function getToken(): string
     {
         return $this->token;
     }
 
     /**
-     * @return string
-     */
-    public function getBaseURI()
-    {
-        return $this->baseURI;
-    }
-
-    /**
-     * @param string $method
-     * @param string $uri
-     * @param array $options
-     *
-     * @return array
-     *
      * @throws AuthenticationException
      * @throws FMException
      */
@@ -206,11 +179,23 @@ class FMConnection extends AbstractConnection
                 ];
             }
 
-            return isset($content['response']['data']) ? $content['response']['data'] : $content['response'];
+            return $content['response']['data'] ?? $content['response'];
         } catch (Exception $e) {
             /** @var ClientException $e */
             if(null === $e->getResponse()) {
                 throw new FMException($e->getMessage(), $e->getCode(), $e);
+            }
+
+            // With FMCloud if the token has expired then we get a status code of 401 (not to be confused with
+            // FileMaker's 401, no records) rather than a 200 status code and error 952 as we get on-prem.
+            if(401 === $e->getResponse()->getStatusCode()) {
+                if($this->retried) {
+                    throw new FMException($e->getMessage(), $e->getCode(), $e);
+                }
+
+                $this->retried = true;
+                $this->forceTokenRefresh();
+                return $this->performFMRequest($method, $uri, $options);
             }
 
             $content = json_decode($e->getResponse()->getBody()->getContents());
@@ -237,7 +222,7 @@ class FMConnection extends AbstractConnection
      * @param string $host
      * @param string $database
      */
-    private function setBaseURL(string $host, string $database)
+    private function setBaseURL(string $host, string $database): void
     {
         $this->baseURI =
             ('http' === substr($host, 4) ? $host : 'https://' . $host) .
@@ -255,11 +240,9 @@ class FMConnection extends AbstractConnection
     }
 
     /**
-     * @param array $params
-     *
      * @throws AuthenticationException
      */
-    private function fetchToken(array $params)
+    private function fetchToken(array $params): void
     {
         if($token = $this->readTokenFromDisk()) {
             $this->token = $token;
@@ -282,28 +265,38 @@ class FMConnection extends AbstractConnection
                 ]
             ]);
 
-            $content = json_decode($response->getBody()->getContents());
+            $content = json_decode($response->getBody()->getContents(), false);
             $this->token = $content->response->token;
             $this->writeTokenToDisk();
         } catch (Exception $e) {
             /** @var ClientException $e */
-            if(404 == $e->getResponse()->getStatusCode()) {
+            if(null === $e->getResponse()) {
+                throw new AuthenticationException($e->getMessage(), $e->getCode(), $e);
+            }
+
+            if(404 === $e->getResponse()->getStatusCode()) {
                 throw new AuthenticationException($e->getResponse()->getReasonPhrase(), $e->getResponse()->getStatusCode());
             }
 
-            $content = json_decode($e->getResponse()->getBody()->getContents());
+            $content = json_decode($e->getResponse()->getBody()->getContents(), false);
             throw new AuthenticationException($content->messages[0]->message, $content->messages[0]->code);
         } catch(GuzzleException $e) {
             throw new AuthenticationException('Unknown error', -1);
         }
     }
 
+    /**
+     * @throws AuthenticationException
+     * @noinspection PhpUndefinedNamespaceInspection
+     * @noinspection PhpFullyQualifiedNameUsageInspection
+     */
     private function fetchCloudToken(): void
     {
         if(!class_exists('\MSDev\FMCloudAuthenticator\Authenticate')) {
             throw new AuthenticationException('You must include matatirosoln/fm-cloud-authentication when using FileMaker Cloud.', -1);
         }
 
+        /** @noinspection PhpUndefinedClassInspection */
         $credentials = new \MSDev\FMCloudAuthenticator\Credentials(
             $this->params['host'],
             $this->params['user'],
@@ -321,7 +314,7 @@ class FMConnection extends AbstractConnection
     /**
      * @throws AuthenticationException
      */
-    private function forceTokenRefresh()
+    private function forceTokenRefresh(): void
     {
         $file = $this->getTokenDiskLocation();
         file_put_contents($file, '');
@@ -350,7 +343,7 @@ class FMConnection extends AbstractConnection
     /**
      * Write the Data API token to disk for later access
      */
-    private function writeTokenToDisk()
+    private function writeTokenToDisk(): void
     {
         $file = $this->getTokenDiskLocation();
         file_put_contents($file, $this->token);
@@ -358,10 +351,8 @@ class FMConnection extends AbstractConnection
 
     /**
      * Determine where to save the Data API token
-     *
-     * @return string
      */
-    private function getTokenDiskLocation()
+    private function getTokenDiskLocation(): string
     {
         return sys_get_temp_dir().DIRECTORY_SEPARATOR.'fmp-token.txt';
     }
