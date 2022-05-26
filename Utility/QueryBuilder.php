@@ -271,6 +271,7 @@ class QueryBuilder
     private function generateWhere($params)
     {
         $request = [];
+        $requests = [];
         $cols = $this->selectColumns($this->query);
         $pc = 1;
 
@@ -279,12 +280,29 @@ class QueryBuilder
 
             if(array_key_exists($query['base_expr'], $cols)) {
                 $op = $this->getOperator($this->query['WHERE'][$c+1]['base_expr'], $params[$pc]);
-                $request[$query['no_quotes']['parts'][1]] = $op.($params[$pc] === false ? 0 : $params[$pc]);
+                if('!=' === $op) {
+                    // if this isn't the first loop, add the current request to the requests array and reset it
+                    if(!empty($request)) {
+                        $requests[] = $request;
+                        $request = [];
+                    }
+                    $requests[] = [
+                        $query['no_quotes']['parts'][1] => ($params[$pc] === false ? 0 : $params[$pc]),
+                        'omit' => "true",
+                    ];
+
+                } else {
+                    $request[$query['no_quotes']['parts'][1]] = $op . ($params[$pc] === false ? 0 : $params[$pc]);
+                }
                 $pc++;
             }
         }
 
-        return [$request];
+        if(!empty($request)) {
+            $requests[] = $request;
+        }
+
+        return $requests;
     }
 
 
@@ -398,7 +416,9 @@ class QueryBuilder
             case '=<':
             case '=>':
                 return $request;
-            // ExpliAdding greatercitly here for clarity
+            case '<>':
+                return '!=';
+            // Explicitly adding here for clarity
             case 'LIKE':
             case '!=':
             // Anything else gets the standard FM find method
