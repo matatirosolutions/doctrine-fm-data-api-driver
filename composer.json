@@ -33,7 +33,7 @@
     "php": ">=7.2.0",
     "ext-json": "*",
     "ext-pdo": "*",
-    "doctrine/dbal": "2.*",
+    "doctrine/dbal": "2.*|3.*",
     "doctrine/orm": "2.*",
     "greenlion/php-sql-parser": "^4.0",
     "guzzlehttp/guzzle": "^7.3"
