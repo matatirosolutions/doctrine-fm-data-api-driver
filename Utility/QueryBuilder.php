@@ -295,6 +295,24 @@ class QueryBuilder
                     $request[$query['no_quotes']['parts'][1]] = $op . ($params[$pc] === false ? 0 : $params[$pc]);
                 }
                 $pc++;
+            } elseif ('bracket_expression' === $query['expr_type']) {
+                $baseRequest = $request;
+                foreach($query['sub_tree'] as $subCount => $subExpression) {
+                    if('colref' === $subExpression['expr_type']
+                        && array_key_exists('no_quotes', $subExpression)
+                        && isset($subExpression['no_quotes']['parts'])
+                        && isset($subExpression['no_quotes']['parts'][1])
+                        && array_key_exists($subExpression['base_expr'], $cols)
+                    ) {
+                        $op = $this->getOperator($query['sub_tree'][$subCount+1]['base_expr'], $params[$pc]);
+                        $request = $baseRequest;
+                        $request[$subExpression['no_quotes']['parts'][1]] = $op . ($params[$pc] === false ? 0 : $params[$pc]);
+                        $requests[] = $request;
+
+                        $request = [];
+                        $pc++;
+                    }
+                }
             }
         }
 
