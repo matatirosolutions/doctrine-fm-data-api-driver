@@ -164,6 +164,7 @@ class FMConnection extends AbstractConnection
             'headers' => [
                 'Content-Type' => 'application/json',
                 'Authorization' => sprintf('Bearer %s', $this->token),
+                'Accept-Encoding' => 'gzip, deflate, br',
             ]
         ];
 
