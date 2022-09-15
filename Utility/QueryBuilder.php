@@ -291,6 +291,16 @@ class QueryBuilder
                         'omit' => "true",
                     ];
 
+                } elseif('IN' === $op) {
+                    $baseRequest = $request;
+                    $inCount = substr_count($this->query['WHERE'][$c+2]['base_expr'], '?');
+                    for($i = 0; $i < $inCount; $i++) {
+                        $request = $baseRequest;
+                        $request[$query['no_quotes']['parts'][1]] = '==' . ($params[$pc] === false ? 0 : $params[$pc]);
+                        $requests[] = $request;
+                        $pc++;
+                    }
+                    $request = null;
                 } else {
                     $request[$query['no_quotes']['parts'][1]] = $op . ($params[$pc] === false ? 0 : $params[$pc]);
                 }
@@ -433,6 +443,7 @@ class QueryBuilder
             case '<=':
             case '=<':
             case '=>':
+            case 'IN':
                 return $request;
             case '<>':
                 return '!=';

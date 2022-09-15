@@ -86,7 +86,8 @@ and replace it with
 ## Considerations ##
 
 1. Because of the way in which more 'conventional' databases handle relationships, there is no concept of a portal. To access related data create a corresponding model for that table (layout) and create standard Doctrine relationships (OneToOne, OneToMany, ManyToOne etc).
-2. If your model contains caclulation fields you will run into issues when trying to create a new record, since Doctrine will try and set those fields to null. One 'solution' to this is to create a 'stub' of your model which contains only the fields which are necesary to create a new record and to instantiate that for record creation. If you head down this route you'll likely want to create an interface which both your stub and your real entity implement so that you can typehint appropriately.
+2. If your model contains calculation fields you will run into issues when trying to create a new record, since Doctrine will try and set those fields to null. One 'solution' to this is to create a 'stub' of your model which contains only the fields which are necessary to create a new record and to instantiate that for record creation. If you head down this route you'll likely want to create an interface which both your stub and your real entity implement so that you can typehint appropriately.
+3. If you wish to perform an IN query, then it needs to be the last `andWhere` set in the query builder so that the previous conditions will be applied to all of the query objects which the Data API requires to simulate an IN query.  
  
 ## See also ##
  
