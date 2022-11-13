@@ -19,8 +19,10 @@
 
 namespace MSDev\DoctrineFMDataAPIDriver;
 
+use Doctrine\DBAL\DBALException;
 use Doctrine\DBAL\Driver;
 use Doctrine\DBAL\Connection;
+use Doctrine\DBAL\Schema\AbstractSchemaManager;
 use MSDev\DoctrineFMDataAPIDriver\Exception\MethodNotSupportedException;
 
 /**
@@ -31,54 +33,36 @@ use MSDev\DoctrineFMDataAPIDriver\Exception\MethodNotSupportedException;
 class FMDriver implements Driver
 {
     /**
-     * @param array $params
-     * @param null $username
-     * @param null $password
-     * @param array $driverOptions
-     *
-     * @return FMConnection
-     *
      * @throws Exception\AuthenticationException
-     * @throws \Doctrine\DBAL\DBALException
-     * @throws \GuzzleHttp\Exception\GuzzleException
+     * @throws DBALException
      */
-    public function connect(array $params, $username = null, $password = null, array $driverOptions = array())
+    public function connect(array $params, $username = null, $password = null, array $driverOptions = array()): FMConnection
     {
         return new FMConnection($params, $this);
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function getName()
+    public function getName(): string
     {
-        return 'filemaker_php';
+        return 'filemaker_dapi';
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function getDatabase(Connection $conn)
+    public function getDatabase(Connection $conn): string
     {
         $params = $conn->getParams();
-
         return $params['dbname'];
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function getDatabasePlatform()
+    public function getDatabasePlatform(): FMPlatform
     {
         return new FMPlatform();
     }
 
     /**
-     * {@inheritdoc}
      * @throws MethodNotSupportedException
      */
-    public function getSchemaManager(Connection $conn)
+    public function getSchemaManager(Connection $conn): AbstractSchemaManager
     {
         throw new MethodNotSupportedException('code-based schema changes');
     }
+
 }

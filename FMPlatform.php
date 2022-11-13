@@ -21,45 +21,34 @@ namespace MSDev\DoctrineFMDataAPIDriver;
 
 use Doctrine\DBAL\Platforms\AbstractPlatform;
 use Doctrine\DBAL\DBALException;
-use Doctrine\DBAL\Schema\Column;
+use Doctrine\DBAL\Platforms\DateIntervalUnit;
 use Doctrine\DBAL\Schema\ColumnDiff;
 use Doctrine\DBAL\Schema\Identifier;
 use Doctrine\DBAL\Schema\Index;
 use Doctrine\DBAL\Schema\Table;
 use Doctrine\DBAL\Schema\TableDiff;
 use Doctrine\DBAL\Types\Type;
+use Doctrine\DBAL\Types\Types;
 
 class FMPlatform extends AbstractPlatform
 {
-    /**
-     * {@inheritdoc}
-     */
-    public function getBinaryMaxLength()
+
+    public function getBinaryMaxLength(): int
     {
         return 32704;
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function getBinaryDefaultLength()
+    public function getBinaryDefaultLength(): int
     {
         return 1;
     }
 
-    /**
-     * {@inheritDoc}
-     */
-    public function getBlobTypeDeclarationSQL(array $field)
+    public function getBlobTypeDeclarationSQL(array $column): string
     {
-        // todo blob(n) with $field['length'];
         return 'BLOB(1M)';
     }
 
-    /**
-     * {@inheritDoc}
-     */
-    public function initializeDoctrineTypeMappings()
+    public function initializeDoctrineTypeMappings(): void
     {
         $this->doctrineTypeMapping = array(
             'smallint'      => 'smallint',
@@ -80,12 +69,9 @@ class FMPlatform extends AbstractPlatform
         );
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function isCommentedDoctrineType(Type $doctrineType)
+    public function isCommentedDoctrineType(Type $doctrineType): bool
     {
-        if ($doctrineType->getName() === Type::BOOLEAN) {
+        if ($doctrineType->getName() === Types::BOOLEAN) {
             // We require a commented boolean type in order to distinguish between boolean and smallint
             // as both (have to) map to the same native type.
             return true;
@@ -94,76 +80,48 @@ class FMPlatform extends AbstractPlatform
         return parent::isCommentedDoctrineType($doctrineType);
     }
 
-    /**
-     * {@inheritDoc}
-     */
-    protected function getVarcharTypeDeclarationSQLSnippet($length, $fixed)
+    protected function getVarcharTypeDeclarationSQLSnippet($length, $fixed): string
     {
         return $fixed ? ($length ? 'CHAR(' . $length . ')' : 'CHAR(255)')
                 : ($length ? 'VARCHAR(' . $length . ')' : 'VARCHAR(255)');
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    protected function getBinaryTypeDeclarationSQLSnippet($length, $fixed)
+    protected function getBinaryTypeDeclarationSQLSnippet($length, $fixed): string
     {
         return $fixed ? 'BINARY(' . ($length ?: 255) . ')' : 'VARBINARY(' . ($length ?: 255) . ')';
     }
 
-    /**
-     * {@inheritDoc}
-     */
-    public function getClobTypeDeclarationSQL(array $field)
+    public function getClobTypeDeclarationSQL(array $column): string
     {
-        // todo clob(n) with $field['length'];
         return 'CLOB(1M)';
     }
 
-    /**
-     * {@inheritDoc}
-     */
-    public function getName()
+    public function getName(): string
     {
-        return 'db2';
+        return 'fms';
     }
 
-    /**
-     * {@inheritDoc}
-     */
-    public function getBooleanTypeDeclarationSQL(array $columnDef)
+    public function getBooleanTypeDeclarationSQL(array $column): string
     {
         return 'SMALLINT';
     }
 
-    /**
-     * {@inheritDoc}
-     */
-    public function getIntegerTypeDeclarationSQL(array $columnDef)
+    public function getIntegerTypeDeclarationSQL(array $column): string
     {
-        return 'INTEGER' . $this->_getCommonIntegerTypeDeclarationSQL($columnDef);
+        return 'INTEGER' . $this->_getCommonIntegerTypeDeclarationSQL($column);
     }
 
-    /**
-     * {@inheritDoc}
-     */
-    public function getBigIntTypeDeclarationSQL(array $columnDef)
+    public function getBigIntTypeDeclarationSQL(array $column): string
     {
-        return 'BIGINT' . $this->_getCommonIntegerTypeDeclarationSQL($columnDef);
+        return 'BIGINT' . $this->_getCommonIntegerTypeDeclarationSQL($column);
     }
 
-    /**
-     * {@inheritDoc}
-     */
-    public function getSmallIntTypeDeclarationSQL(array $columnDef)
+    public function getSmallIntTypeDeclarationSQL(array $column): string
     {
-        return 'SMALLINT' . $this->_getCommonIntegerTypeDeclarationSQL($columnDef);
+        return 'SMALLINT' . $this->_getCommonIntegerTypeDeclarationSQL($column);
     }
 
-    /**
-     * {@inheritDoc}
-     */
-    protected function _getCommonIntegerTypeDeclarationSQL(array $columnDef)
+    protected function _getCommonIntegerTypeDeclarationSQL(array $column): string
     {
         $autoinc = '';
         if ( ! empty($columnDef['autoincrement'])) {
@@ -173,82 +131,58 @@ class FMPlatform extends AbstractPlatform
         return $autoinc;
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function getBitAndComparisonExpression($value1, $value2)
+    public function getBitAndComparisonExpression($value1, $value2): string
     {
         return 'BITAND(' . $value1 . ', ' . $value2 . ')';
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function getBitOrComparisonExpression($value1, $value2)
+    public function getBitOrComparisonExpression($value1, $value2): string
     {
         return 'BITOR(' . $value1 . ', ' . $value2 . ')';
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    protected function getDateArithmeticIntervalExpression($date, $operator, $interval, $unit)
+    protected function getDateArithmeticIntervalExpression($date, $operator, $interval, $unit): string
     {
         switch ($unit) {
-            case self::DATE_INTERVAL_UNIT_WEEK:
+            case DateIntervalUnit::WEEK:
                 $interval *= 7;
-                $unit = self::DATE_INTERVAL_UNIT_DAY;
+                $unit = DateIntervalUnit::DAY;
                 break;
 
-            case self::DATE_INTERVAL_UNIT_QUARTER:
+            case DateIntervalUnit::QUARTER:
                 $interval *= 3;
-                $unit = self::DATE_INTERVAL_UNIT_MONTH;
+                $unit = DateIntervalUnit::MONTH;
                 break;
         }
 
         return $date . ' ' . $operator . ' ' . $interval . ' ' . $unit;
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function getDateDiffExpression($date1, $date2)
+    public function getDateDiffExpression($date1, $date2): string
     {
         return 'DAYS(' . $date1 . ') - DAYS(' . $date2 . ')';
     }
 
-    /**
-     * {@inheritDoc}
-     */
-    public function getDateTimeTypeDeclarationSQL(array $fieldDeclaration)
+    public function getDateTimeTypeDeclarationSQL(array $column): string
     {
-        if (isset($fieldDeclaration['version']) && $fieldDeclaration['version'] == true) {
+        if (isset($column['version']) && $column['version']) {
             return "TIMESTAMP(0) WITH DEFAULT";
         }
 
         return 'TIMESTAMP(0)';
     }
 
-    /**
-     * {@inheritDoc}
-     */
-    public function getDateTypeDeclarationSQL(array $fieldDeclaration)
+    public function getDateTypeDeclarationSQL(array $column): string
     {
         return 'DATE';
     }
 
-    /**
-     * {@inheritDoc}
-     */
-    public function getTimeTypeDeclarationSQL(array $fieldDeclaration)
+    public function getTimeTypeDeclarationSQL(array $column): string
     {
         return 'TIME';
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function getTruncateTableSQL($tableName, $cascade = false)
+    public function getTruncateTableSQL($tableName, $cascade = false): string
     {
         $tableIdentifier = new Identifier($tableName);
 
@@ -265,7 +199,7 @@ class FMPlatform extends AbstractPlatform
      *
      * @return string
      */
-    public function getListTableColumnsSQL($table, $database = null)
+    public function getListTableColumnsSQL($table, $database = null): string
     {
         $table = $this->quoteStringLiteral($table);
 
@@ -313,26 +247,17 @@ class FMPlatform extends AbstractPlatform
         ";
     }
 
-    /**
-     * {@inheritDoc}
-     */
-    public function getListTablesSQL()
+    public function getListTablesSQL(): string
     {
         return "SELECT NAME FROM SYSIBM.SYSTABLES WHERE TYPE = 'T'";
     }
 
-    /**
-     * {@inheritDoc}
-     */
-    public function getListViewsSQL($database)
+    public function getListViewsSQL($database): string
     {
         return "SELECT NAME, TEXT FROM SYSIBM.SYSVIEWS";
     }
 
-    /**
-     * {@inheritDoc}
-     */
-    public function getListTableIndexesSQL($table, $currentDatabase = null)
+    public function getListTableIndexesSQL($table, $database = null): string
     {
         $table = $this->quoteStringLiteral($table);
 
@@ -353,10 +278,7 @@ class FMPlatform extends AbstractPlatform
                 ORDER BY idxcol.COLSEQ ASC";
     }
 
-    /**
-     * {@inheritDoc}
-     */
-    public function getListTableForeignKeysSQL($table)
+    public function getListTableForeignKeysSQL($table): string
     {
         $table = $this->quoteStringLiteral($table);
 
@@ -387,99 +309,63 @@ class FMPlatform extends AbstractPlatform
                 ORDER BY fkcol.COLSEQ ASC";
     }
 
-    /**
-     * {@inheritDoc}
-     */
-    public function getCreateViewSQL($name, $sql)
+    public function getCreateViewSQL($name, $sql): string
     {
         return "CREATE VIEW ".$name." AS ".$sql;
     }
 
-    /**
-     * {@inheritDoc}
-     */
-    public function getDropViewSQL($name)
+    public function getDropViewSQL($name): string
     {
         return "DROP VIEW ".$name;
     }
 
-    /**
-     * {@inheritDoc}
-     */
-    public function getCreateDatabaseSQL($database)
+    public function getCreateDatabaseSQL($database): string
     {
         return "CREATE DATABASE ".$database;
     }
 
-    /**
-     * {@inheritDoc}
-     */
-    public function getDropDatabaseSQL($database)
+    public function getDropDatabaseSQL($database): string
     {
         return "DROP DATABASE " . $database;
     }
 
-    /**
-     * {@inheritDoc}
-     */
-    public function supportsCreateDropDatabase()
+    public function supportsCreateDropDatabase(): bool
     {
         return false;
     }
 
-    /**
-     * {@inheritDoc}
-     */
-    public function supportsReleaseSavepoints()
+    public function supportsReleaseSavepoints(): bool
     {
         return false;
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function supportsCommentOnStatement()
+    public function supportsCommentOnStatement(): bool
     {
         return true;
     }
 
-    /**
-     * {@inheritDoc}
-     */
-    public function getCurrentDateSQL()
+    public function getCurrentDateSQL(): string
     {
         return 'CURRENT DATE';
     }
 
-    /**
-     * {@inheritDoc}
-     */
-    public function getCurrentTimeSQL()
+    public function getCurrentTimeSQL(): string
     {
         return 'CURRENT TIME';
     }
 
-    /**
-     * {@inheritDoc}
-     */
-    public function getCurrentTimestampSQL()
+    public function getCurrentTimestampSQL(): string
     {
         return "CURRENT TIMESTAMP";
     }
 
-    /**
-     * {@inheritDoc}
-     */
-    public function getIndexDeclarationSQL($name, Index $index)
+    public function getIndexDeclarationSQL($name, Index $index): string
     {
         // Index declaration in statements like CREATE TABLE is not supported.
         throw DBALException::notSupported(__METHOD__);
     }
 
-    /**
-     * {@inheritDoc}
-     */
-    protected function _getCreateTableSQL($tableName, array $columns, array $options = array())
+    protected function _getCreateTableSQL($tableName, array $columns, array $options = array()): array
     {
         $indexes = array();
         if (isset($options['indexes'])) {
@@ -495,10 +381,7 @@ class FMPlatform extends AbstractPlatform
         return $sqls;
     }
 
-    /**
-     * {@inheritDoc}
-     */
-    public function getAlterTableSQL(TableDiff $diff)
+    public function getAlterTableSQL(TableDiff $diff): array
     {
         $sql = array();
         $columnSql = array();
@@ -639,7 +522,7 @@ class FMPlatform extends AbstractPlatform
      *
      * @return array
      */
-    private function getAlterColumnClausesSQL(ColumnDiff $columnDiff)
+    private function getAlterColumnClausesSQL(ColumnDiff $columnDiff): array
     {
         $column = $columnDiff->column->toArray();
 
@@ -679,10 +562,7 @@ class FMPlatform extends AbstractPlatform
         return $clauses;
     }
 
-    /**
-     * {@inheritDoc}
-     */
-    protected function getPreAlterTableIndexForeignKeySQL(TableDiff $diff)
+    protected function getPreAlterTableIndexForeignKeySQL(TableDiff $diff): array
     {
         $sql = array();
         $table = $diff->getName($this)->getQuotedName($this);
@@ -713,23 +593,17 @@ class FMPlatform extends AbstractPlatform
         return $sql;
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    protected function getRenameIndexSQL($oldIndexName, Index $index, $tableName)
+    protected function getRenameIndexSQL($oldIndexName, Index $index, $tableName): array
     {
         if (strpos($tableName, '.') !== false) {
-            list($schema) = explode('.', $tableName);
+            [$schema] = explode('.', $tableName);
             $oldIndexName = $schema . '.' . $oldIndexName;
         }
 
         return array('RENAME INDEX ' . $oldIndexName . ' TO ' . $index->getQuotedName($this));
     }
 
-    /**
-     * {@inheritDoc}
-     */
-    public function getDefaultValueDeclarationSQL($field)
+    public function getDefaultValueDeclarationSQL($field): string
     {
         if ( ! empty($field['autoincrement'])) {
             return '';
@@ -744,34 +618,22 @@ class FMPlatform extends AbstractPlatform
         return parent::getDefaultValueDeclarationSQL($field);
     }
 
-    /**
-     * {@inheritDoc}
-     */
-    public function getEmptyIdentityInsertSQL($tableName, $identifierColumnName)
+    public function getEmptyIdentityInsertSQL($tableName, $identifierColumnName): string
     {
         return 'INSERT INTO ' . $tableName . ' (' . $identifierColumnName . ') VALUES (DEFAULT)';
     }
 
-    /**
-     * {@inheritDoc}
-     */
-    public function getCreateTemporaryTableSnippetSQL()
+    public function getCreateTemporaryTableSnippetSQL(): string
     {
         return "DECLARE GLOBAL TEMPORARY TABLE";
     }
 
-    /**
-     * {@inheritDoc}
-     */
-    public function getTemporaryTableName($tableName)
+    public function getTemporaryTableName($tableName): string
     {
         return "SESSION." . $tableName;
     }
 
-    /**
-     * {@inheritDoc}
-     */
-    protected function doModifyLimitQuery($query, $limit, $offset = null)
+    protected function doModifyLimitQuery($query, $limit, $offset = null): string
     {
         $where = array();
 
@@ -795,10 +657,7 @@ class FMPlatform extends AbstractPlatform
         );
     }
 
-    /**
-     * {@inheritDoc}
-     */
-    public function getLocateExpression($str, $substr, $startPos = false)
+    public function getLocateExpression($str, $substr, $startPos = false): string
     {
         if ($startPos == false) {
             return 'LOCATE(' . $substr . ', ' . $str . ')';
@@ -807,10 +666,7 @@ class FMPlatform extends AbstractPlatform
         return 'LOCATE(' . $substr . ', ' . $str . ', '.$startPos.')';
     }
 
-    /**
-     * {@inheritDoc}
-     */
-    public function getSubstringExpression($value, $from, $length = null)
+    public function getSubstringExpression($value, $from, $length = null): string
     {
         if ($length === null) {
             return 'SUBSTR(' . $value . ', ' . $from . ')';
@@ -819,18 +675,12 @@ class FMPlatform extends AbstractPlatform
         return 'SUBSTR(' . $value . ', ' . $from . ', ' . $length . ')';
     }
 
-    /**
-     * {@inheritDoc}
-     */
-    public function supportsIdentityColumns()
+    public function supportsIdentityColumns(): bool
     {
         return true;
     }
 
-    /**
-     * {@inheritDoc}
-     */
-    public function prefersIdentityColumns()
+    public function prefersIdentityColumns(): bool
     {
         return true;
     }
@@ -840,44 +690,29 @@ class FMPlatform extends AbstractPlatform
      *
      * DB2 returns all column names in SQL result sets in uppercase.
      */
-    public function getSQLResultCasing($column)
+    public function getSQLResultCasing($column): string
     {
         return strtoupper($column);
     }
 
-    /**
-     * {@inheritDoc}
-     */
-    public function getForUpdateSQL()
+    public function getForUpdateSQL(): string
     {
         return ' WITH RR USE AND KEEP UPDATE LOCKS';
     }
 
-    /**
-     * {@inheritDoc}
-     */
-    public function getDummySelectSQL()
+    public function getDummySelectSQL(): string
     {
         return 'SELECT 1 FROM sysibm.sysdummy1';
     }
 
-    /**
-     * {@inheritDoc}
-     *
-     * DB2 supports savepoints, but they work semantically different than on other vendor platforms.
-     *
-     * TODO: We have to investigate how to get DB2 up and running with savepoints.
-     */
-    public function supportsSavepoints()
+    public function supportsSavepoints(): bool
     {
         return false;
     }
 
-    /**
-     * {@inheritDoc}
-     */
-    protected function getReservedKeywordsClass()
+    protected function getReservedKeywordsClass(): string
     {
         return 'Doctrine\DBAL\Platforms\Keywords\DB2Keywords';
     }
+
 }
