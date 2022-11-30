@@ -1,8 +1,6 @@
 <?php
 
-
 namespace MSDev\DoctrineFMDataAPIDriver;
-
 
 use ArrayIterator;
 use Doctrine\DBAL\Driver\Statement;
@@ -16,6 +14,7 @@ use MSDev\DoctrineFMDataAPIDriver\Utility\MetaData;
 use MSDev\DoctrineFMDataAPIDriver\Utility\QueryBuilder;
 use PDO;
 use PHPSQLParser\PHPSQLParser;
+use stdClass;
 
 
 class FMStatement implements IteratorAggregate, Statement
@@ -23,85 +22,65 @@ class FMStatement implements IteratorAggregate, Statement
     /** @var int */
     public $id;
 
-    /**
-     * @var resource
-     */
+    /** @var resource */
     private $_stmt;
 
-    /**
-     * @var array
-     */
-    private $_bindParam = array();
+    /** @var array */
+    private $_bindParam = [];
 
     /**
      * @var string Name of the default class to instantiate when fetch mode is \PDO::FETCH_CLASS.
      */
-    private $defaultFetchClass = '\stdClass';
+    private $defaultFetchClass = stdClass::class;
 
     /**
      * @var string Constructor arguments for the default class to instantiate when fetch mode is \PDO::FETCH_CLASS.
      */
-    private $defaultFetchClassCtorArgs = array();
+    private $defaultFetchClassCtorArgs = [];
 
-    /**
-     * @var integer
-     */
+    /** @var integer */
     private $_defaultFetchMode = PDO::FETCH_BOTH;
 
     /**
-     * The query which has been parsed from the SQL by PHPSQLParser
-     *
-     * @var array
+     * @var array The query which has been parsed from the SQL by PHPSQLParser
      */
     private $request;
 
     /**
-     * Hold the response from FileMaker be it a result object or an error object
-     *
-     * @var array
+     * @var array|stdClass Hold the response from FileMaker be it a result object or an error object
      */
     private $response;
 
     /**
-     * Records returned upon successful query
-     *
-     * @var array
+     * @var array Records returned upon successful query
      */
-    private $records = array();
+    private $records = [];
 
-    /**
-     * @var int
-     */
+    /** @var int */
     private $numRows = 0;
 
     /**
-     * Indicates whether the response is in the state when fetching results is possible
-     *
-     * @var bool
+     * @var bool Indicates whether the response is in a state where fetching results is possible
      */
     private $result;
 
-    /**
-     * @var PHPSQLParser
-     */
+    /** @var PHPSQLParser */
     private $sqlParser;
 
-    /**
-     * @var QueryBuilder
-     */
+    /** @var QueryBuilder */
     private $qb;
 
-    /** @var FMConnection  */
+    /** @var FMConnection */
     private $conn;
-
 
     /**
      * @param string $stmt
      * @param FMConnection $conn
+     * @throws Exception
      */
     public function __construct(string $stmt, FMConnection $conn)
     {
-        $this->id = Uniqid('', true).mt_rand(999, 999999);
+        $this->id = Uniqid('', true) . random_int(999, 999999);
 
         $this->_stmt = $stmt;
         $this->conn = $conn;
@@ -113,7 +92,7 @@ class FMStatement implements IteratorAggregate, Statement
     /**
      * {@inheritdoc}
      */
-    public function bindValue($param, $value, $type = null)
+    public function bindValue($param, $value, $type = null): bool
     {
         return $this->bindParam($param, $value, $type);
     }
@@ -121,23 +100,22 @@ class FMStatement implements IteratorAggregate, Statement
     /**
      * {@inheritdoc}
      */
-    public function bindParam($column, &$variable, $type = null, $length = null)
+    public function bindParam($param, &$variable, $type = null, $length = null): bool
     {
-        $this->_bindParam[$column] =& $variable;
-
+        $this->_bindParam[$param] =& $variable;
         return true;
     }
 
     /**
      * {@inheritdoc}
      */
-    public function closeCursor()
+    public function closeCursor(): bool
     {
-        if ( ! $this->_stmt) {
+        if (!$this->_stmt) {
             return false;
         }
 
-        $this->_bindParam = array();
+        $this->_bindParam = [];
         $this->_stmt = null;
         $this->result = false;
 
@@ -149,7 +127,7 @@ class FMStatement implements IteratorAggregate, Statement
      */
     public function columnCount()
     {
-        if ( ! $this->_stmt) {
+        if (!$this->_stmt) {
             return false;
         }
 
@@ -161,33 +139,40 @@ class FMStatement implements IteratorAggregate, Statement
      */
     public function errorCode()
     {
+        /** @var stdClass $this- >response */
         return $this->response->code;
     }
 
     /**
      * {@inheritdoc}
      */
-    public function errorInfo()
+    public function errorInfo(): array
     {
-        return array(
-            0 => $this->response->getMessage(),
-            1 => $this->response->getCode(),
-        );
+        /** @var Exception $response */
+        $response = $this->response;
+        return [
+            0 => $response->getMessage(),
+            1 => $response->getCode(),
+        ];
     }
 
     /**
      * {@inheritdoc}
-     * @throws NotImplementedException|AuthenticationException|FMException
+     * @throws NotImplementedException|AuthenticationException|FMException|Exception
      */
     public function execute($params = null)
     {
         $this->setRequest();
-        $this->id = Uniqid('', true).mt_rand(999, 999999);
-        $this->qb->getQueryFromRequest($this->request, $this->_stmt, $this->_bindParam);
+        $this->id = Uniqid('', true) . random_int(999, 999999);
 
-        if($this->conn->isTransactionOpen()) {
-            $this->conn->queryStack[$this->id] = clone $this;
+        if ($this->conn->isTransactionOpen()) {
+            $clone = clone $this;
+            $clone->qb = new QueryBuilder($this->conn);
+            $clone->qb->getQueryFromRequest($this->request, $this->_stmt, $this->_bindParam);
+
+            $this->conn->queryStack[$this->id] = $clone;
         } else {
+            $this->qb->getQueryFromRequest($this->request, $this->_stmt, $this->_bindParam);
             $this->performCommand();
         }
     }
@@ -195,7 +180,7 @@ class FMStatement implements IteratorAggregate, Statement
     /**
      * @throws AuthenticationException|FMException
      */
-    public function performCommand()
+    public function performCommand(): void
     {
         $this->records = $this->conn->performFMRequest($this->qb->getMethod(), $this->qb->getUri(), $this->qb->getOptions());
         $this->numRows = count($this->records);
@@ -205,11 +190,11 @@ class FMStatement implements IteratorAggregate, Statement
     /**
      * {@inheritdoc}
      */
-    public function setFetchMode($fetchMode, $arg2 = null, $arg3 = null)
+    public function setFetchMode($fetchMode, $arg2 = null, $arg3 = null): bool
     {
-        $this->_defaultFetchMode         = $fetchMode;
-        $this->defaultFetchClass         = $arg2 ? $arg2 : $this->defaultFetchClass;
-        $this->defaultFetchClassCtorArgs = $arg3 ? (array) $arg3 : $this->defaultFetchClassCtorArgs;
+        $this->_defaultFetchMode = $fetchMode;
+        $this->defaultFetchClass = $arg2 ?: $this->defaultFetchClass;
+        $this->defaultFetchClassCtorArgs = $arg3 ? (array)$arg3 : $this->defaultFetchClassCtorArgs;
 
         return true;
     }
@@ -220,12 +205,10 @@ class FMStatement implements IteratorAggregate, Statement
     public function getIterator()
     {
         $data = $this->fetchAll();
-
         return new ArrayIterator($data);
     }
 
     /**
-     * {@inheritdoc}
      * @throws MethodNotSupportedException
      */
     public function fetch($fetchMode = null, $cursorOrientation = PDO::FETCH_ORI_NEXT, $cursorOffset = 0)
@@ -236,25 +219,23 @@ class FMStatement implements IteratorAggregate, Statement
         }
 
         $fetchMode = $fetchMode ?: $this->_defaultFetchMode;
-        switch ($fetchMode) {
-            case PDO::FETCH_ASSOC:
-                return count($this->records) === 0 ? false : $this->recordToArray(array_shift($this->records));
-            default:
-                throw new MethodNotSupportedException($fetchMode);
+        if ($fetchMode === PDO::FETCH_ASSOC) {
+            return count($this->records) === 0 ? false : $this->recordToArray(array_shift($this->records));
         }
+
+        throw new MethodNotSupportedException($fetchMode);
     }
 
     /**
-     * {@inheritdoc}
      * @throws MethodNotSupportedException
      */
-    public function fetchAll($fetchMode = null, $fetchArgument = NULL, $ctorArgs = NULL)
+    public function fetchAll($fetchMode = null, $fetchArgument = null, $ctorArgs = null): array
     {
-        $rows = array();
+        $rows = [];
 
         switch ($fetchMode) {
             case PDO::FETCH_CLASS:
-                while ($row = call_user_func_array(array($this, 'fetch'), func_get_args())) {
+                while ($row = call_user_func_array([$this, 'fetch'], func_get_args())) {
                     $rows[] = $row;
                 }
                 break;
@@ -264,7 +245,7 @@ class FMStatement implements IteratorAggregate, Statement
                 }
                 break;
             default:
-                while ($row = $this->fetch('fetch mode '.$fetchMode)) {
+                while ($row = $this->fetch('fetch mode ' . $fetchMode)) {
                     $rows[] = $row;
                 }
         }
@@ -273,7 +254,6 @@ class FMStatement implements IteratorAggregate, Statement
     }
 
     /**
-     * {@inheritdoc}
      * @throws MethodNotSupportedException
      */
     public function fetchColumn($columnIndex = 0)
@@ -284,23 +264,20 @@ class FMStatement implements IteratorAggregate, Statement
             return false;
         }
 
-        return isset($row[$columnIndex]) ? $row[$columnIndex] : null;
+        return $row[$columnIndex] ?? null;
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function rowCount()
+    public function rowCount(): int
     {
         return $this->numRows;
     }
 
-    private function setRequest()
+    private function setRequest(): void
     {
         $query = $this->populateParams($this->_stmt, $this->_bindParam);
         $tokens = $this->sqlParser->parse($query);
 
-        if('select' === strtolower(array_keys($tokens)[0])) {
+        if ('select' === strtolower(array_keys($tokens)[0])) {
             $tokens = $this->sqlParser->parse($this->_stmt);
         }
         $this->request = $tokens;
@@ -316,7 +293,7 @@ class FMStatement implements IteratorAggregate, Statement
      */
     private function populateParams($statement, $params)
     {
-        return array_reduce($params, function($statement, $param) {
+        return array_reduce($params, static function ($statement, $param) {
             $param = str_ireplace(['?', '(', ')', '@', '#', '`', '--', 'union', 'where', 'rename'], '', $param);
             return strpos($statement, '?')
                 ? substr_replace($statement, addslashes($param), strpos($statement, '?'), strlen('?'))
@@ -328,33 +305,33 @@ class FMStatement implements IteratorAggregate, Statement
      * Parses a FileMaker record into an array whose keys are the fields from
      * the requested query.
      *
-     * @param  array $rec
+     * @param array $rec
      * @return array
      */
-    private function recordToArray(array $rec)
+    private function recordToArray(array $rec): array
     {
         $select = $this->request['SELECT'];
-        if('subquery' == $this->request['FROM'][0]['expr_type']) {
+        if ('subquery' === $this->request['FROM'][0]['expr_type']) {
             $select = $this->request['FROM'][0]['sub_tree']['FROM'][0]['sub_tree']['SELECT'];
         }
 
         $resp = [];
-        foreach($select as $field) {
-            if('rec_id' === $field['no_quotes']['parts'][1]) {
+        foreach ($select as $field) {
+            if ('rec_id' === $field['no_quotes']['parts'][1]) {
                 $resp[$field['alias']['no_quotes']['parts'][0]] = $rec['recordId'];
                 continue;
             }
-            if('mod_id' === $field['no_quotes']['parts'][1]) {
+            if ('mod_id' === $field['no_quotes']['parts'][1]) {
                 $resp[$field['alias']['no_quotes']['parts'][0]] = $rec['modId'];
                 continue;
             }
-            if('rec_meta' === $field['no_quotes']['parts'][1]) {
+            if ('rec_meta' === $field['no_quotes']['parts'][1]) {
                 $resp[$field['alias']['no_quotes']['parts'][0]] = $this->getMetadataArray();
                 continue;
             }
 
             $data = $rec['fieldData'][$field['no_quotes']['parts'][1]];
-            $resp[$field['alias']['no_quotes']['parts'][0]] = $data == "" ? null : $data;
+            $resp[$field['alias']['no_quotes']['parts'][0]] = empty($data) ? null : $data;
         }
 
         return $resp;
@@ -369,16 +346,16 @@ class FMStatement implements IteratorAggregate, Statement
     public function extractID(): string
     {
         $idColumn = $this->qb->getIdColumn($this->request, new MetaData());
-        if('rec_id' == $idColumn) {
+        if ('rec_id' === $idColumn) {
             return $this->records['recordId'];
         }
 
-        $uri = $this->qb->getUri() .'/' . $this->records['recordId'];
+        $uri = $this->qb->getUri() . '/' . $this->records['recordId'];
         try {
             $record = $this->conn->performFMRequest('GET', $uri, $this->qb->getOptions());
             return $record[0]['fieldData'][$idColumn];
-        } catch(Exception $e) {
-            throw new FMException('Unable to locate record primary key with error '. $e->getMessage());
+        } catch (Exception $e) {
+            throw new FMException('Unable to locate record primary key with error ' . $e->getMessage());
         }
 
     }
