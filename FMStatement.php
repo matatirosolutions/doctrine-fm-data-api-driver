@@ -164,6 +164,7 @@ class FMStatement implements IteratorAggregate, Statement
     {
         $this->setRequest();
         $this->id = Uniqid('', true) . random_int(999, 999999);
+        $this->qb->getQueryFromRequest($this->request, $this->_stmt, $this->_bindParam);
 
         if ($this->conn->isTransactionOpen()) {
             $clone = clone $this;
@@ -172,7 +173,6 @@ class FMStatement implements IteratorAggregate, Statement
 
             $this->conn->queryStack[$this->id] = $clone;
         } else {
-            $this->qb->getQueryFromRequest($this->request, $this->_stmt, $this->_bindParam);
             $this->performCommand();
         }
     }
