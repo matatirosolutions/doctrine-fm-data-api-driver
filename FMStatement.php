@@ -331,7 +331,7 @@ class FMStatement implements IteratorAggregate, Statement
             }
 
             $data = $rec['fieldData'][$field['no_quotes']['parts'][1]];
-            $resp[$field['alias']['no_quotes']['parts'][0]] = empty($data) ? null : $data;
+            $resp[$field['alias']['no_quotes']['parts'][0]] = $data === '' ? null : $data;
         }
 
         return $resp;
