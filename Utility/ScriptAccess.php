@@ -1,47 +1,45 @@
 <?php
-/**
- * Created by PhpStorm.
- * User: SteveWinter
- * Date: 10/04/2017
- * Time: 15:10
- */
 
 namespace MSDev\DoctrineFMDataAPIDriver\Utility;
 
 use Doctrine\DBAL\Connection;
+use Exception;
 use MSDev\DoctrineFMDataAPIDriver\Exception\FMException;
 use MSDev\DoctrineFMDataAPIDriver\FMConnection;
+use Throwable;
+
 
 class ScriptAccess
 {
 
-    /**
-     * @var FMConnection
-     */
+    /** @var FMConnection */
     protected $conn;
 
-    /**
-     * ScriptAccess constructor.
-     * @param Connection $conn
-     */
-    function __construct(Connection $conn)
+    public function __construct(Connection $conn)
     {
-        $this->conn = $conn->getWrappedConnection();
+        try {
+            $this->conn = $conn->getWrappedConnection();
+        } catch (Exception | Throwable $except) {
+            $this->conn = null;
+        }
     }
 
 
     /**
-     * @param string $layout
-     * @param int $recId
-     * @param string $script
-     * @param string $param
-     *
-     * @return array
-     *
      * @throws FMException
      */
-    public function performScript($layout, $recId, $script, $param = '', $returnScriptResult = false)
+    public function performScript(
+        string $layout,
+        int $recId,
+        string $script,
+        string $param = '',
+        bool $returnScriptResult = false
+    ): array
     {
+        if(null === $this->conn) {
+            throw new FMException('No connection to FileMaker');
+        }
+
         $uri = sprintf('/layouts/%s/records/%s?script=%s&script.param=%s', $layout, $recId, $script, $param);
         try {
             $scriptResult = $this->conn->performFMRequest('GET', $uri, [], $returnScriptResult);
@@ -53,8 +51,9 @@ class ScriptAccess
             $record = $this->conn->performFMRequest('GET', $uri, []);
 
             return $record[0]['fieldData'];
-        } catch(\Exception $e) {
+        } catch(Exception $e) {
             throw new FMException($e->getMessage(), $e->getCode());
         }
     }
+
 }
