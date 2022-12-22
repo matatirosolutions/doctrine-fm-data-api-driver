@@ -7,6 +7,7 @@ use Doctrine\DBAL\DBALException;
 use Exception;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\ClientException;
+use GuzzleHttp\Exception\ConnectException;
 use GuzzleHttp\Exception\GuzzleException;
 use MSDev\DoctrineFMDataAPIDriver\Exception\FMException;
 use MSDev\DoctrineFMDataAPIDriver\Exception\AuthenticationException;
@@ -181,6 +182,8 @@ class FMConnection extends AbstractConnection
             }
 
             return $content['response']['data'] ?? $content['response'];
+        } catch (ConnectException $e) {
+            throw new FMException($e->getMessage(), $e->getCode(), $e);
         } catch (Exception $e) {
             /** @var ClientException $e */
             if(null === $e->getResponse()) {
@@ -269,6 +272,8 @@ class FMConnection extends AbstractConnection
             $content = json_decode($response->getBody()->getContents(), false);
             $this->token = $content->response->token;
             $this->writeTokenToDisk();
+        } catch (ConnectException $e) {
+            throw new AuthenticationException($e->getMessage(), $e->getCode(), $e);
         } catch (Exception $e) {
             /** @var ClientException $e */
             if(null === $e->getResponse()) {
