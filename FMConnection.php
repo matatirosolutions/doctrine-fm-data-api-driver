@@ -202,19 +202,24 @@ class FMConnection extends AbstractConnection
                 return $this->performFMRequest($method, $uri, $options);
             }
 
-            $content = json_decode($e->getResponse()->getBody()->getContents());
-            if(401 == $content->messages[0]->code) {
+            // We should be able to decode data from the response body
+            $content = json_decode($e->getResponse()->getBody()->getContents(), false);
+            // But not always
+            if(null === $content) {
+                throw new FMException($e->getResponse()->getReasonPhrase(), $e->getResponse()->getStatusCode());
+            }
+
+            if(401 === (int)$content->messages[0]->code) {
                 // no records found
                 return [];
             }
 
-            // if the token has expired or is invalid then in theory 952 will come back
+            // if the token has expired or is invalid then in theory 952 will come back,
             // but sometimes you get 105 missing layout (go figure), so try a token refresh
-            if(in_array($content->messages[0]->code, [105, 952]) && !$this->retried) {
+            if(!$this->retried && in_array((int)$content->messages[0]->code, [105, 952], true)) {
                 $this->retried = true;
                 $this->forceTokenRefresh();
                 return $this->performFMRequest($method, $uri, $options);
-
             }
             throw new FMException($content->messages[0]->message, $content->messages[0]->code);
         } catch(GuzzleException $e) {
