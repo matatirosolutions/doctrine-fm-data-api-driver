@@ -32,7 +32,7 @@ class ScriptAccess
         string $layout,
         int $recId,
         string $script,
-        string $param = '',
+        $param = '',
         bool $returnScriptResult = false
     ): array
     {
