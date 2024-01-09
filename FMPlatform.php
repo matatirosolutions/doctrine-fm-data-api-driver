@@ -29,6 +29,7 @@ use Doctrine\DBAL\Schema\Table;
 use Doctrine\DBAL\Schema\TableDiff;
 use Doctrine\DBAL\Types\Type;
 use Doctrine\DBAL\Types\Types;
+use RuntimeException;
 
 class FMPlatform extends AbstractPlatform
 {
@@ -713,6 +714,11 @@ class FMPlatform extends AbstractPlatform
     protected function getReservedKeywordsClass(): string
     {
         return 'Doctrine\DBAL\Platforms\Keywords\DB2Keywords';
+    }
+
+    public function getCurrentDatabaseExpression(): string
+    {
+        throw new RuntimeException('Not supported');
     }
 
 }

@@ -21,8 +21,11 @@ namespace MSDev\DoctrineFMDataAPIDriver;
 
 use Doctrine\DBAL\DBALException;
 use Doctrine\DBAL\Driver;
+use Doctrine\DBAL\Driver\API\ExceptionConverter as ExceptionConverterInterface;
 use Doctrine\DBAL\Connection;
+use Doctrine\DBAL\Platforms\AbstractPlatform;
 use Doctrine\DBAL\Schema\AbstractSchemaManager;
+use MSDev\DoctrineFMDataAPIDriver\ExceptionConverter;
 use MSDev\DoctrineFMDataAPIDriver\Exception\MethodNotSupportedException;
 
 /**
@@ -60,9 +63,13 @@ class FMDriver implements Driver
     /**
      * @throws MethodNotSupportedException
      */
-    public function getSchemaManager(Connection $conn): AbstractSchemaManager
+    public function getSchemaManager(Connection $conn, AbstractPlatform $platform): AbstractSchemaManager
     {
-        throw new MethodNotSupportedException('code-based schema changes');
+        throw new MethodNotSupportedException('code-based schema changes are not supported');
     }
 
+    public function getExceptionConverter(): ExceptionConverterInterface
+    {
+        return new ExceptionConverter();
+    }
 }

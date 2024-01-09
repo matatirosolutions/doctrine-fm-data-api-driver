@@ -2,8 +2,11 @@
 
 namespace MSDev\DoctrineFMDataAPIDriver;
 
-use Doctrine\DBAL\Connection as AbstractConnection;
 use Doctrine\DBAL\DBALException;
+use Doctrine\DBAL\Driver\Result;
+use Doctrine\DBAL\Driver\ServerInfoAwareConnection;
+use Doctrine\DBAL\Driver\Statement;
+use Doctrine\DBAL\ParameterType;
 use Exception;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\ClientException;
@@ -13,7 +16,7 @@ use MSDev\DoctrineFMDataAPIDriver\Exception\FMException;
 use MSDev\DoctrineFMDataAPIDriver\Exception\AuthenticationException;
 use MSDev\DoctrineFMDataAPIDriver\Exception\NotImplementedException;
 
-class FMConnection extends AbstractConnection
+class FMConnection implements ServerInfoAwareConnection
 {
     private const SERVER_VERSION_CLOUD = 'FMCloud';
 
@@ -58,8 +61,6 @@ class FMConnection extends AbstractConnection
         $this->params = $params;
         $this->setBaseURL($params['host'], $params['dbname']);
         $this->fetchToken($params);
-
-        parent::__construct($params, $driver);
     }
 
     public function rollBack()
@@ -67,9 +68,9 @@ class FMConnection extends AbstractConnection
         // this method must exist, but rollback isn't possible so nothing is implemented
     }
 
-    public function prepare($prepareString)
+    public function prepare(string $sql): Statement
     {
-        $this->statement = new FMStatement($prepareString, $this);
+        $this->statement = new FMStatement($sql, $this);
         $this->statement->setFetchMode($this->defaultFetchMode);
 
         return $this->statement;
@@ -85,7 +86,7 @@ class FMConnection extends AbstractConnection
      * {@inheritdoc}
      * @throws NotImplementedException|AuthenticationException|FMException
      */
-    public function query()
+    public function query(string $sql): Result
     {
         $args = func_get_args();
         $sql = $args[0];
@@ -152,6 +153,24 @@ class FMConnection extends AbstractConnection
     public function getToken(): string
     {
         return $this->token;
+    }
+
+    /**
+     * @return array|null
+     */
+    public function getMetadata(): ?array
+    {
+        return $this->metadata;
+    }
+
+    public function quote($value, $type = ParameterType::STRING)
+    {
+        throw new NotImplementedException('Quote method is not implemented in this connection');
+    }
+
+    public function exec(string $sql): int
+    {
+        throw new NotImplementedException('Exec method is not implemented in this connection');
     }
 
     /**
@@ -238,14 +257,6 @@ class FMConnection extends AbstractConnection
             ('/' === substr($host, -1) ? '' : '/') .
             'fmi/data/v1/databases/' .
             $database . '/';
-    }
-
-    /**
-     * @return array|null
-     */
-    public function getMetadata(): ?array
-    {
-        return $this->metadata;
     }
 
     /**
