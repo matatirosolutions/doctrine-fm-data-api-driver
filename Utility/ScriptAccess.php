@@ -12,13 +12,12 @@ use Throwable;
 class ScriptAccess
 {
 
-    /** @var FMConnection */
-    protected $conn;
+    protected FMRequest $conn;
 
     public function __construct(Connection $conn)
     {
         try {
-            $this->conn = $conn->getWrappedConnection();
+            $this->conn = $conn->getNativeConnection();
         } catch (Exception | Throwable $except) {
             $this->conn = null;
         }
@@ -30,7 +29,7 @@ class ScriptAccess
      */
     public function performScript(
         string $layout,
-        int $recId,
+        ?int $recId,
         string $script,
         $param = '',
         bool $returnScriptResult = false
@@ -40,7 +39,11 @@ class ScriptAccess
             throw new FMException('No connection to FileMaker');
         }
 
-        $uri = sprintf('/layouts/%s/records/%s?script=%s&script.param=%s', $layout, $recId, $script, $param);
+        $uri = sprintf('/layouts/%s/script/%s?script.param=%s', $layout, $script, $param);
+        if(null !== $recId) {
+            $uri = sprintf('/layouts/%s/records/%s?script=%s&script.param=%s', $layout, $recId, $script, $param);
+        }
+
         try {
             $scriptResult = $this->conn->performFMRequest('GET', $uri, [], $returnScriptResult);
             if($returnScriptResult) {

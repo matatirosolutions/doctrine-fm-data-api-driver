@@ -3,6 +3,7 @@
 namespace MSDev\DoctrineFMDataAPIDriver;
 
 use ArrayIterator;
+use Doctrine\DBAL\Driver\Result;
 use Doctrine\DBAL\Driver\Statement;
 use Exception;
 use IteratorAggregate;
@@ -12,6 +13,7 @@ use MSDev\DoctrineFMDataAPIDriver\Exception\MethodNotSupportedException;
 use MSDev\DoctrineFMDataAPIDriver\Exception\NotImplementedException;
 use MSDev\DoctrineFMDataAPIDriver\Utility\MetaData;
 use MSDev\DoctrineFMDataAPIDriver\Utility\QueryBuilder;
+use MSDev\DoctrineFMDataAPIDriver\FMResult;
 use PDO;
 use PHPSQLParser\PHPSQLParser;
 use stdClass;
@@ -157,10 +159,9 @@ class FMStatement implements IteratorAggregate, Statement
     }
 
     /**
-     * {@inheritdoc}
      * @throws NotImplementedException|AuthenticationException|FMException|Exception
      */
-    public function execute($params = null)
+    public function execute($params = null): Result
     {
         $this->setRequest();
         $this->id = Uniqid('', true) . random_int(999, 999999);
@@ -175,6 +176,8 @@ class FMStatement implements IteratorAggregate, Statement
         } else {
             $this->performCommand();
         }
+
+        return new FMResult($this->request, $this->records);
     }
 
     /**
@@ -182,7 +185,7 @@ class FMStatement implements IteratorAggregate, Statement
      */
     public function performCommand(): void
     {
-        $this->records = $this->conn->performFMRequest($this->qb->getMethod(), $this->qb->getUri(), $this->qb->getOptions());
+        $this->records = $this->conn->getNativeConnection()->performFMRequest($this->qb->getMethod(), $this->qb->getUri(), $this->qb->getOptions());
         $this->numRows = count($this->records);
         $this->result = true;
     }
@@ -352,7 +355,7 @@ class FMStatement implements IteratorAggregate, Statement
 
         $uri = $this->qb->getUri() . '/' . $this->records['recordId'];
         try {
-            $record = $this->conn->performFMRequest('GET', $uri, $this->qb->getOptions());
+            $record = $this->conn->getNativeConnection()->performFMRequest('GET', $uri, $this->qb->getOptions());
             return $record[0]['fieldData'][$idColumn];
         } catch (Exception $e) {
             throw new FMException('Unable to locate record primary key with error ' . $e->getMessage());

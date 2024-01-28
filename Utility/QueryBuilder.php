@@ -1,103 +1,89 @@
 <?php
-/**
- * Created by PhpStorm.
- * User: SteveWinter
- * Date: 03/04/2017
- * Time: 20:31
- */
 
 namespace MSDev\DoctrineFMDataAPIDriver\Utility;
 
 use Doctrine\ORM\Mapping\ClassMetadata;
+use JsonException;
 use MSDev\DoctrineFMDataAPIDriver\FMConnection;
 use MSDev\DoctrineFMDataAPIDriver\Exception\FMException;
 use MSDev\DoctrineFMDataAPIDriver\Exception\NotImplementedException;
+use RuntimeException;
+use Throwable;
 
 class QueryBuilder
 {
-    /** @var FMConnection */
-    private $connetion;
+    private FMConnection $connection;
 
-    /** @var string */
-    private $operation;
+    private string $operation;
 
-    /** @var array */
-    private $query;
+    private array $query;
 
-    /** @var string */
-    private $method;
+    private string $method;
 
-    /** @var string */
-    private $uri;
+    private string $uri;
 
-    /** @var array */
-    private $options = [];
+    private array $options = [];
 
 
-    public function __construct(FMConnection $connetion)
+    public function __construct(FMConnection $connection)
     {
-        $this->connetion = $connetion;
+        $this->connection = $connection;
     }
 
-
-    public function getOperation()
-    {
-        return $this->operation;
-    }
-
-    /**
-     * @return string
-     */
-    public function getMethod()
+    public function getMethod(): string
     {
         return $this->method;
     }
 
-    /**
-     * @return string
-     */
-    public function getUri()
+    public function getUri(): string
     {
         return $this->uri;
     }
 
-    /**
-     * @return array
-     */
     public function getOptions(): array
     {
         return $this->options;
     }
 
-    public function getQueryFromRequest(array $tokens, string $statement, array $params) {
+    /**
+     * @throws FMException | NotImplementedException | JsonException
+     */
+    public function getQueryFromRequest(array $tokens, string $statement, array $params): void
+    {
         $this->operation = strtolower(array_keys($tokens)[0]);
 
         switch($this->operation) {
             case 'select':
-                return $this->generateFindCommand($tokens, $params);
+                $this->generateFindCommand($tokens, $params);
+                return;
             case 'update':
-                return $this->generateUpdateCommand($tokens, $statement, $params);
+                $this->generateUpdateCommand($tokens, $statement, $params);
+                return;
             case 'insert':
-                return $this->generateInsertCommand($tokens, $params);
+                $this->generateInsertCommand($tokens, $params);
+                return;
             case 'delete':
-                return $this->generateDeleteCommand($tokens, $params);
+                $this->generateDeleteCommand($tokens, $params);
+                return;
         }
 
         throw new NotImplementedException('Unknown request type');
     }
 
 
-    private function generateFindCommand($tokens, $params)
+    /**
+     * @throws FMException | JsonException
+     */
+    private function generateFindCommand($tokens, $params): void
     {
         $layout = $this->getLayout($tokens);
         if (empty($this->query['WHERE'])) {
-            $this->body = [];
             $this->method = 'GET';
             $this->uri = sprintf('layouts/%s/records', $layout);
 
             $prefix = '?';
             if(array_key_exists('ORDER', $this->query)) {
-                $this->uri .= '?_sort='.json_encode($this->getSort());
+                $this->uri .= '?_sort='. json_encode($this->getSort(), JSON_THROW_ON_ERROR);
                 $prefix= '&';
             }
 
@@ -105,7 +91,7 @@ class QueryBuilder
             // as the FM Data API only returns 100 records by default
             $offset = 1;
             $limit = 10000;
-            if(isset($tokens['FROM'][0]['expr_type']) && 'subquery' == $tokens['FROM'][0]['expr_type']) {
+            if(isset($tokens['FROM'][0]['expr_type']) && 'subquery' === $tokens['FROM'][0]['expr_type']) {
                 $offset = $this->getSkip($tokens);
                 $limit = $this->getMax($tokens);
             }
@@ -126,25 +112,21 @@ class QueryBuilder
         }
 
         // Limit
-        if('subquery' == $tokens['FROM'][0]['expr_type']) {
+        if('subquery' === $tokens['FROM'][0]['expr_type']) {
             $body['offset'] = $this->getSkip($tokens);
             $body['limit'] = $this->getMax($tokens);
         }
 
         $this->options = [
-            'body' => json_encode($body)
+            'body' => json_encode($body, JSON_THROW_ON_ERROR)
         ];
     }
 
 
     /**
-     * @param $tokens
-     * @param $statement
-     * @param $params
-     *
-     * @throws FMException
+     * @throws FMException | JsonException
      */
-    private function generateUpdateCommand($tokens, $statement, $params)
+    private function generateUpdateCommand(array $tokens, string $statement, array $params): void
     {
         $this->method = 'PATCH';
         $layout = $this->getLayout($tokens);
@@ -168,12 +150,15 @@ class QueryBuilder
         $this->options = [
             'body' => json_encode([
                 'fieldData' => $data,
-            ])
+            ], JSON_THROW_ON_ERROR)
         ];
     }
 
 
-    private function generateDeleteCommand($tokens, $params)
+    /**
+     * @throws FMException | JsonException
+     */
+    private function generateDeleteCommand(array $tokens, array $params): void
     {
         $this->method = 'DELETE';
         $layout = $this->getLayout($tokens);
@@ -183,13 +168,16 @@ class QueryBuilder
     }
 
 
-    private function generateInsertCommand($tokens, $params)
+    /**
+     * @throws FMException | JsonException
+     */
+    private function generateInsertCommand(array $tokens, array $params): void
     {
         $layout = $this->getLayout($tokens);
         $list = substr($tokens['INSERT'][2]['base_expr'], 1, -1);
         $fields = explode(',', $list);
 
-        // need to know which is the Id column
+        // need to know which is the ID column
         $idColumn = $this->getIdColumn($tokens, new MetaData());
         $this->method = 'POST';
         $this->uri = sprintf('layouts/%s/records', $layout);
@@ -206,19 +194,14 @@ class QueryBuilder
         $this->options = [
             'body' => json_encode([
                 'fieldData' => $data,
-            ], JSON_FORCE_OBJECT)
+            ], JSON_THROW_ON_ERROR | JSON_FORCE_OBJECT)
         ];
     }
 
     /**
-     * @param $tokens
-     * @param $layout
-     *
-     * @param $params
-     * @return integer
-     * @throws FMException
+     * @throws FMException  | JsonException
      */
-    private function getRecordID($tokens, $layout, $params): int
+    private function getRecordID(array $tokens, string $layout, array $params): int
     {
         $uri = sprintf('layouts/%s/_find', $layout);
         $uuid = $params[count($params)];
@@ -227,24 +210,27 @@ class QueryBuilder
                 'query' => [
                     [str_replace("'", '', $tokens['WHERE'][0]['base_expr']) => $uuid]
                 ]
-            ])
+            ], JSON_THROW_ON_ERROR)
         ];
 
         try {
-            $record = $this->connetion->performFMRequest('POST', $uri, $options);
+            $connection = $this->connection->getNativeConnection();
+            if(null === $connection) {
+                throw new RuntimeException('No connection to FileMaker');
+            }
+
+            $record = $connection->performFMRequest('POST', $uri, $options);
             return $record[0]['recordId'];
-        } catch (\Exception $e) {
+        } catch (Throwable $e) {
             throw new FMException($e->getMessage(), $e->getCode());
         }
     }
 
     /**
-     * @param array $tokens
-     * @return mixed
-     *
      * @throws FMException
      */
-    public function getLayout(array $tokens) {
+    public function getLayout(array $tokens): string
+    {
         $this->query = $tokens;
         if (empty($tokens['FROM']) && empty($tokens['INSERT']) && empty($tokens['UPDATE'])) {
             throw new FMException('Unknown layout');
@@ -256,7 +242,7 @@ class QueryBuilder
             case 'update':
                 return $tokens['UPDATE'][0]['no_quotes']['parts'][0];
             default:
-                if('subquery' == $tokens['FROM'][0]['expr_type']) {
+                if('subquery' === $tokens['FROM'][0]['expr_type']) {
                     $this->query = $tokens['FROM'][0]['sub_tree']['FROM'][0]['sub_tree'];
                     return $tokens['FROM'][0]['sub_tree']['FROM'][0]['sub_tree']['FROM'][0]['no_quotes']['parts'][0];
                 }
@@ -264,11 +250,7 @@ class QueryBuilder
         }
     }
 
-    /**
-     * @param array $params
-     * @return array
-     */
-    private function generateWhere($params)
+    private function generateWhere(array $params): array
     {
         $request = [];
         $requests = [];
@@ -334,7 +316,7 @@ class QueryBuilder
     }
 
 
-    private function selectColumns($tokens)
+    private function selectColumns($tokens): array
     {
         $cols = [];
         foreach($tokens['SELECT'] as $column) {
@@ -358,15 +340,16 @@ class QueryBuilder
     /**
      * returns the column of the id
      *
-     * @param  array    $tokens
-     * @param  MetaData $metaData
+     * @param array $tokens
+     * @param MetaData $metaData
      * @return string
      *
+     * @throws FMException
      */
-    public function getIdColumn(array $tokens, MetaData $metaData)
+    public function getIdColumn(array $tokens, MetaData $metaData): string
     {
         $table = $this->getLayout($tokens);
-        $meta = array_filter($metaData->get(), function ($meta) use ($table) {
+        $meta = array_filter($metaData->get(), static function ($meta) use ($table) {
             /** @var ClassMetadata $meta */
             return $meta->getTableName() === $table;
         });
@@ -382,9 +365,9 @@ class QueryBuilder
      * @param array $tokens
      * @return int
      */
-    private function getSkip($tokens)
+    private function getSkip(array $tokens): int
     {
-        if(isset($tokens['WHERE'][1]['base_expr']) && '>=' == $tokens['WHERE'][1]['base_expr']) {
+        if(isset($tokens['WHERE'][1]['base_expr']) && '>=' === $tokens['WHERE'][1]['base_expr']) {
             return (int)$tokens['WHERE'][2]['base_expr'];
         }
 
@@ -397,14 +380,14 @@ class QueryBuilder
      * @param array $tokens
      * @return int
      */
-    private function getMax($tokens)
+    private function getMax(array $tokens): int
     {
         $skip = $this->getSkip($tokens);
         if(isset($tokens['WHERE'][6]['base_expr'])) {
             return (int)$tokens['WHERE'][6]['base_expr'] - $skip + 1;
         }
 
-        if(isset($tokens['WHERE'][1]['base_expr']) && '<=' == $tokens['WHERE'][1]['base_expr']) {
+        if(isset($tokens['WHERE'][1]['base_expr']) && '<=' === $tokens['WHERE'][1]['base_expr']) {
             return (int)$tokens['WHERE'][2]['base_expr'];
         }
 
@@ -413,26 +396,25 @@ class QueryBuilder
 
     /**
      * Generate an array of sort requests
-     *
-     * @return array
+==
      */
-    private function getSort()
+    private function getSort(): array
     {
         $sort = [];
-        foreach($this->query['ORDER'] as $k => $rule) {
+        foreach($this->query['ORDER'] as $rule) {
             $sort[] = [
                 'fieldName' => $rule['no_quotes']['parts'][1],
-                'sortOrder' => 'ASC' == $rule['direction'] ? 'ascend' : 'descend'
+                'sortOrder' => 'ASC' === $rule['direction'] ? 'ascend' : 'descend'
             ];
         }
         return $sort;
     }
 
-    private function getOperator($request, $parameter)
+    private function getOperator(string $request, string $parameter): string
     {
         switch($request) {
             case '=':
-                $param = substr($parameter, 0, 1);
+                $param = $parameter[0];
                 if(in_array($param, ['=', '<', '>'])) {
                     return '';
                 }
@@ -455,4 +437,5 @@ class QueryBuilder
                 return '';
         }
     }
+
 }
