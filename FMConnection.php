@@ -354,7 +354,8 @@ class FMConnection extends AbstractConnection
      */
     private function getTokenDiskLocation(): string
     {
-        return sys_get_temp_dir().DIRECTORY_SEPARATOR.'fmp-token.txt';
+        $salt = md5(__DIR__);
+        return sprintf('%s%sfmp-token-%s.txt', sys_get_temp_dir(), DIRECTORY_SEPARATOR, $salt);
     }
 
 }
