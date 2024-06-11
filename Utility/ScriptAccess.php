@@ -59,4 +59,21 @@ class ScriptAccess
         }
     }
 
+    /**
+     * @throws FMException
+     */
+    public function executeScript(string $layout, string $script, string $param = ''): array
+    {
+        if(null === $this->conn) {
+            throw new FMException('No connection to FileMaker');
+        }
+
+        $uri = sprintf('layouts/%s/script/%s?script.param=%s', $layout, $script, $param);
+        try {
+            return $this->conn->performFMRequest('GET', $uri, [], true);
+        } catch(Exception $e) {
+            throw new FMException($e->getMessage(), $e->getCode());
+        }
+    }
+
 }
