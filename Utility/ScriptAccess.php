@@ -12,7 +12,7 @@ use Throwable;
 class ScriptAccess
 {
 
-    protected FMRequest $conn;
+    protected ?FMRequest $conn;
 
     public function __construct(Connection $conn)
     {
