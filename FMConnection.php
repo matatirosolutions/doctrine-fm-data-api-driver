@@ -67,9 +67,9 @@ class FMConnection implements ServerInfoAwareConnection
     public function query(string $sql): Result
     {
         $stmt = $this->prepare($sql);
-        $stmt->execute();
+        $result = $stmt->execute();
 
-        return $stmt;
+        return $result;
     }
 
     /**
@@ -112,7 +112,7 @@ class FMConnection implements ServerInfoAwareConnection
     }
 
     /**
-     * At present it's not possible to get metadata from the Data API
+     * At present, it's not possible to get metadata from the Data API
      * so for now this is hard coded.
      */
     public function getServerVersion(): string
