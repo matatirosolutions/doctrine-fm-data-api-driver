@@ -209,7 +209,9 @@ class FMConnection extends AbstractConnection
                 throw new FMException($e->getResponse()->getReasonPhrase(), $e->getResponse()->getStatusCode());
             }
 
-            if(401 === (int)$content->messages[0]->code) {
+            // If we're trying to get just one record and there are no records, we'll get a 101. If it's
+            // a general query with no results we'll get 401
+            if(401 === (int)$content->messages[0]->code || 101 === (int)$content->messages[0]->code) {
                 // no records found
                 return [];
             }
