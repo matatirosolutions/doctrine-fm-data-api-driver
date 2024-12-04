@@ -75,6 +75,8 @@ class FMStatement implements IteratorAggregate, Statement
     /** @var FMConnection */
     private $conn;
 
+    private array $metadata = [];
+
     /**
      * @param string $stmt
      * @param FMConnection $conn
@@ -177,7 +179,7 @@ class FMStatement implements IteratorAggregate, Statement
             $this->performCommand();
         }
 
-        return new FMResult($this->request, $this->records);
+        return new FMResult($this->request, $this->records, $this->metadata);
     }
 
     /**
@@ -186,6 +188,7 @@ class FMStatement implements IteratorAggregate, Statement
     public function performCommand(): void
     {
         $this->records = $this->conn->getNativeConnection()->performFMRequest($this->qb->getMethod(), $this->qb->getUri(), $this->qb->getOptions());
+        $this->metadata = $this->conn->getNativeConnection()->getMetadata();
         $this->numRows = count($this->records);
         $this->result = true;
     }

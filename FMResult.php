@@ -12,6 +12,7 @@ class FMResult implements Result
     public function __construct(
         private readonly array $request,
         private readonly array $results,
+        private readonly array $metadata,
     ) {
     }
 
@@ -80,7 +81,6 @@ class FMResult implements Result
         if ('subquery' === $this->request['FROM'][0]['expr_type']) {
             $select = $this->request['FROM'][0]['sub_tree']['FROM'][0]['sub_tree']['SELECT'];
         }
-
         $resp = [];
         foreach ($select as $field) {
             if ('rec_id' === $field['no_quotes']['parts'][1]) {
@@ -92,7 +92,7 @@ class FMResult implements Result
                 continue;
             }
             if ('rec_meta' === $field['no_quotes']['parts'][1]) {
-                $resp[$field['alias']['no_quotes']['parts'][0]] = $this->getMetadataArray();
+                $resp[$field['alias']['no_quotes']['parts'][0]] = json_encode($this->metadata);
                 continue;
             }
 
@@ -102,4 +102,5 @@ class FMResult implements Result
 
         return $resp;
     }
+
 }
