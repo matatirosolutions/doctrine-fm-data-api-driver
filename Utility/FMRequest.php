@@ -16,7 +16,7 @@ class FMRequest
     private const SERVER_VERSION_CLOUD = 'FMCloud';
 
     private bool $retried = false;
-    private ?array $metadata;
+    private array $metadata = [];
 
     private ?string $token = null;
 
@@ -99,6 +99,11 @@ class FMRequest
         } catch(GuzzleException $e) {
             throw new AuthenticationException('Unknown error', -1);
         }
+    }
+
+    public function getMetadata(): array
+    {
+        return $this->metadata;
     }
 
     private function setBaseURL(): void
