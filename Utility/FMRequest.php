@@ -46,7 +46,7 @@ class FMRequest
         try {
             $response = $client->request($method, $this->baseURI.$uri, array_merge($headers, $options));
             $content = json_decode($response->getBody()->getContents(), true, 512, JSON_THROW_ON_ERROR);
-            $this->metadata = $content['response']['dataInfo'] ?? null;
+            $this->metadata = $content['response']['dataInfo'] ?? [];
 
             if($returnScriptResult) {
                 return [
