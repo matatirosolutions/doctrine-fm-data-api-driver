@@ -414,7 +414,7 @@ class QueryBuilder
     {
         switch($request) {
             case '=':
-                $param = $parameter[0];
+                $param = $parameter[0] ?? null;
                 if(in_array($param, ['=', '<', '>'])) {
                     return '';
                 }
