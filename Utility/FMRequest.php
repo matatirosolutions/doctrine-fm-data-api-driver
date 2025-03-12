@@ -63,7 +63,7 @@ class FMRequest
                 throw new FMException($e->getMessage(), $e->getCode(), $e);
             }
 
-            // With FMCloud if the token has expired then we get a status code of 401 (not to be confused with
+            // With FMCloud if the token has expired, then we get a status code of 401 (not to be confused with
             // FileMaker's 401, no records) rather than a 200 status code and error 952 as we get on-prem.
             if(401 === $e->getResponse()->getStatusCode()) {
                 if($this->retried) {
@@ -104,6 +104,11 @@ class FMRequest
     public function getMetadata(): array
     {
         return $this->metadata;
+    }
+
+    public function getToken(): ?string
+    {
+        return $this->token;
     }
 
     private function setBaseURL(): void

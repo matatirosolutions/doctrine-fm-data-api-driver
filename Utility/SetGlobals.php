@@ -1,10 +1,4 @@
 <?php
-/**
- * Created by PhpStorm.
- * User: SteveWinter
- * Date: 10/04/2017
- * Time: 15:10
- */
 
 namespace MSDev\DoctrineFMDataAPIDriver\Utility;
 
@@ -16,28 +10,19 @@ class SetGlobals
 {
 
     /**
-     * @var FMConnection
+     * @var FMRequest
      */
     protected $conn;
 
-    /**
-     * ScriptAccess constructor.
-     * @param Connection $conn
-     */
     function __construct(Connection $conn)
     {
-        $this->conn = $conn->getWrappedConnection();
+        $this->conn = $conn->getNativeConnection();
     }
 
-
     /**
-     * @param array $globals
-     *
-     * @return array
-     *
      * @throws FMException
      */
-    public function setGlobals($globals = [])
+    public function setGlobals(array $globals = []): array
     {
         $uri = 'globals';
         $opts = [
@@ -51,4 +36,5 @@ class SetGlobals
             throw new FMException($e->getMessage(), $e->getCode());
         }
     }
+
 }

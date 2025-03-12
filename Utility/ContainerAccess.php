@@ -1,16 +1,10 @@
 <?php
-/**
- * Created by PhpStorm.
- * User: SteveWinter
- * Date: 10/04/2017
- * Time: 15:10
- */
 
 namespace MSDev\DoctrineFMDataAPIDriver\Utility;
 
 use Doctrine\DBAL\Connection;
+use GuzzleHttp\Exception\GuzzleException;
 use MSDev\DoctrineFMDataAPIDriver\Exception\FMException;
-use MSDev\DoctrineFMDataAPIDriver\FMConnection;
 use GuzzleHttp\Client;
 
 
@@ -18,18 +12,18 @@ class ContainerAccess
 {
 
     /**
-     * @var FMConnection
+     * @var FMRequest
      */
     protected $con;
 
     /**
      * @var ScriptAccess
      */
-    protected $script;
+    protected ScriptAccess $script;
 
     public function __construct(Connection $conn, ScriptAccess $script)
     {
-        $this->con = $conn->getWrappedConnection();
+        $this->con = $conn->getNativeConnection();
         $this->script = $script;
     }
 
@@ -40,9 +34,10 @@ class ContainerAccess
      *
      * @return string
      *
-     * @throws FMException
+     * @throws FMException|GuzzleException
      */
-    public function getExternalContainerContent($path) {
+    public function getExternalContainerContent(string $path): string
+    {
         $client = new Client();
         $url = $this->generateURL($path);
 
