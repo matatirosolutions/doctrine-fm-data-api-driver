@@ -3,8 +3,8 @@ declare(strict_types=1);
 
 namespace MSDev\DoctrineFMDataAPIDriver;
 
+use Doctrine\DBAL\Driver\Connection;
 use Doctrine\DBAL\Driver\Result;
-use Doctrine\DBAL\Driver\ServerInfoAwareConnection;
 use Doctrine\DBAL\Driver\Statement;
 use Doctrine\DBAL\ParameterType;
 use Exception;
@@ -13,7 +13,7 @@ use MSDev\DoctrineFMDataAPIDriver\Exception\AuthenticationException;
 use MSDev\DoctrineFMDataAPIDriver\Exception\NotImplementedException;
 use MSDev\DoctrineFMDataAPIDriver\Utility\FMRequest;
 
-class FMConnection implements ServerInfoAwareConnection
+class FMConnection implements Connection
 {
     private ?FMRequest $connection = null;
 
@@ -41,7 +41,7 @@ class FMConnection implements ServerInfoAwareConnection
         $this->connection = new FMRequest($params);
     }
 
-    public function rollBack()
+    public function rollBack(): bool
     {
         return true;
     }
@@ -55,7 +55,7 @@ class FMConnection implements ServerInfoAwareConnection
         return $this->statement;
     }
 
-    public function beginTransaction()
+    public function beginTransaction(): bool
     {
         $this->transactionOpen = true;
         return true;
@@ -90,8 +90,7 @@ class FMConnection implements ServerInfoAwareConnection
         return true;
     }
 
-
-    public function isTransactionOpen()
+    public function isTransactionOpen(): bool
     {
         return $this->transactionOpen;
     }
@@ -143,7 +142,7 @@ class FMConnection implements ServerInfoAwareConnection
         return $this->metadata;
     }
 
-    public function quote($value, $type = ParameterType::STRING)
+    public function quote($value, $type = ParameterType::STRING): mixed
     {
         throw new NotImplementedException('Quote method is not implemented in this connection');
     }
