@@ -8,6 +8,7 @@ use GuzzleHttp\Exception\ClientException;
 use GuzzleHttp\Exception\ConnectException;
 use GuzzleHttp\Exception\GuzzleException;
 use GuzzleHttp\Exception\ServerException;
+use GuzzleHttp\Psr7\Exception\MalformedUriException;
 use MSDev\DoctrineFMDataAPIDriver\Exception\AuthenticationException;
 use MSDev\DoctrineFMDataAPIDriver\Exception\FMException;
 
@@ -56,7 +57,7 @@ class FMRequest
             }
 
             return $content['response']['data'] ?? $content['response'];
-        } catch (ConnectException $e) {
+        } catch (ConnectException|MalformedUriException $e) {
             throw new FMException($e->getMessage(), $e->getCode(), $e);
         } catch (ClientException | ServerException $e) {
             if(null === $e->getResponse()) {
