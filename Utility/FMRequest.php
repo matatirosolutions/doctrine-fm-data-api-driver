@@ -57,7 +57,7 @@ class FMRequest
             }
 
             return $content['response']['data'] ?? $content['response'];
-        } catch (ConnectException|MalformedUriException $e) {
+        } catch (ConnectException | MalformedUriException $e) {
             throw new FMException($e->getMessage(), $e->getCode(), $e);
         } catch (ClientException | ServerException $e) {
             if(null === $e->getResponse()) {
@@ -151,7 +151,7 @@ class FMRequest
             $content = json_decode($response->getBody()->getContents(), false);
             $this->token = $content->response->token;
             $this->writeTokenToDisk();
-        } catch (ConnectException $e) {
+        } catch (ConnectException | MalformedUriException $e) {
             throw new AuthenticationException($e->getMessage(), $e->getCode(), $e);
         } catch (Exception $e) {
             /** @var ClientException $e */
