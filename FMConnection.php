@@ -3,8 +3,8 @@ declare(strict_types=1);
 
 namespace MSDev\DoctrineFMDataAPIDriver;
 
-use Doctrine\DBAL\Driver\Connection;
 use Doctrine\DBAL\Driver\Result;
+use Doctrine\DBAL\Driver\ServerInfoAwareConnection;
 use Doctrine\DBAL\Driver\Statement;
 use Doctrine\DBAL\ParameterType;
 use Exception;
@@ -13,7 +13,7 @@ use MSDev\DoctrineFMDataAPIDriver\Exception\AuthenticationException;
 use MSDev\DoctrineFMDataAPIDriver\Exception\NotImplementedException;
 use MSDev\DoctrineFMDataAPIDriver\Utility\FMRequest;
 
-class FMConnection implements Connection
+class FMConnection implements ServerInfoAwareConnection
 {
     private ?FMRequest $connection = null;
 
