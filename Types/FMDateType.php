@@ -65,10 +65,10 @@ class FMDateType extends Type
         }
 
         $date = \DateTime::createFromFormat('m/d/Y', $value);
-        if($date && $date->format('m/d/Y') === $value) {
+        if ($date && $date->format('m/d/Y') === $value) {
             return $date;
         }
 
-        throw ConversionException::conversionFailed(var_export($value, true), $this->name);
+        return null;
     }
 }

@@ -50,10 +50,10 @@ class FMTimeType extends Type
         }
 
         $date = \DateTime::createFromFormat('H:i', $value);
-        if($date && $date->format('H:i') === $value) {
+        if ($date && $date->format('H:i') === $value) {
             return $date;
         }
 
-        throw ConversionException::conversionFailed(var_export($value, true), $this->name);
+        return null;
     }
 }
