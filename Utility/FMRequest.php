@@ -40,13 +40,13 @@ class FMRequest
             'headers' => [
                 'Content-Type' => 'application/json',
                 'Authorization' => sprintf('Bearer %s', $this->token),
-                'Accept-Encoding' => 'gzip, deflate, br',
-            ]
+            ],
+            'decode_content' => true,
         ];
 
         try {
             $response = $client->request($method, $this->baseURI.$uri, array_merge($headers, $options));
-            $content = json_decode($response->getBody()->getContents(), true, 512, JSON_THROW_ON_ERROR);
+            $content = json_decode($response->getBody()->getContents(), true, 512, JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE);
             $this->metadata = $content['response']['dataInfo'] ?? [];
 
             if($returnScriptResult) {
