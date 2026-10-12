@@ -165,6 +165,13 @@ class QueryBuilder
         $recID = $this->getRecordID($tokens, $layout, $params);
 
         $this->uri = sprintf('layouts/%s/records/%s', $layout, $recID);
+
+        // The record is going, so its ID must not be used again
+        $this->connection->forgetRecordId(
+            $layout,
+            str_replace("'", '', $tokens['WHERE'][0]['base_expr']),
+            (string)$params[count($params)]
+        );
     }
 
 
@@ -205,10 +212,18 @@ class QueryBuilder
     {
         $uri = sprintf('layouts/%s/_find', $layout);
         $uuid = $params[count($params)];
+        $field = str_replace("'", '', $tokens['WHERE'][0]['base_expr']);
+
+        // The record may have just been loaded by this field, in which case we already know its ID
+        $known = $this->connection->getRecordId($layout, $field, (string)$uuid);
+        if (null !== $known) {
+            return $known;
+        }
+
         $options = [
             'body' => json_encode([
                 'query' => [
-                    [str_replace("'", '', $tokens['WHERE'][0]['base_expr']) => $uuid]
+                    [$field => $uuid]
                 ]
             ], JSON_THROW_ON_ERROR)
         ];

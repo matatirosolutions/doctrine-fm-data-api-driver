@@ -25,6 +25,12 @@ class FMConnection implements ServerInfoAwareConnection
 
     public array $queryStack = [];
 
+    /** Upper limit on the record IDs held, as a long running worker could otherwise accumulate them forever */
+    private const RECORD_ID_LIMIT = 500;
+
+    /** @var array<string, int> Record IDs of records recently loaded by a single field, keyed by layout, field and value */
+    private array $recordIds = [];
+
     public ?array $metadata;
 
     /**
@@ -39,6 +45,33 @@ class FMConnection implements ServerInfoAwareConnection
     {
         $this->params = $params;
         $this->connection = new FMRequest($params);
+    }
+
+    public function rememberRecordId(string $layout, string $field, string $value, int $recordId): void
+    {
+        $this->recordIds[$this->recordIdKey($layout, $field, $value)] = $recordId;
+        if (count($this->recordIds) > self::RECORD_ID_LIMIT) {
+            array_shift($this->recordIds);
+        }
+    }
+
+    /**
+     * Returns the record ID previously seen for the layout/field/value, if any. A record's ID
+     * doesn't change for its lifetime, and loading the record again refreshes the entry.
+     */
+    public function getRecordId(string $layout, string $field, string $value): ?int
+    {
+        return $this->recordIds[$this->recordIdKey($layout, $field, $value)] ?? null;
+    }
+
+    public function forgetRecordId(string $layout, string $field, string $value): void
+    {
+        unset($this->recordIds[$this->recordIdKey($layout, $field, $value)]);
+    }
+
+    private function recordIdKey(string $layout, string $field, string $value): string
+    {
+        return $layout . '|' . $field . '|' . $value;
     }
 
     public function rollBack(): bool

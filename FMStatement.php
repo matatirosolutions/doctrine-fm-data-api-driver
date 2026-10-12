@@ -170,9 +170,10 @@ class FMStatement implements IteratorAggregate, Statement
         $this->qb->getQueryFromRequest($this->request, $this->_stmt, $this->_bindParam);
 
         if ($this->conn->isTransactionOpen()) {
+            // The query has just been built above, so take a copy of it rather than building it
+            // again - for an UPDATE that would repeat the _find which looks up the record ID.
             $clone = clone $this;
-            $clone->qb = new QueryBuilder($this->conn);
-            $clone->qb->getQueryFromRequest($this->request, $this->_stmt, $this->_bindParam);
+            $clone->qb = clone $this->qb;
 
             $this->conn->queryStack[$this->id] = $clone;
         } else {
@@ -188,9 +189,41 @@ class FMStatement implements IteratorAggregate, Statement
     public function performCommand(): void
     {
         $this->records = $this->conn->getNativeConnection()->performFMRequest($this->qb->getMethod(), $this->qb->getUri(), $this->qb->getOptions());
+        $this->rememberRecordId();
         $this->metadata = $this->conn->getNativeConnection()->getMetadata();
         $this->numRows = count($this->records);
         $this->result = true;
+    }
+
+    /**
+     * When a single record has been found by a single field (i.e. loading an entity by its
+     * primary key) keep hold of its record ID so that a following UPDATE of that entity doesn't
+     * have to run a second _find just to get it.
+     */
+    private function rememberRecordId(): void
+    {
+        $uri = $this->qb->getUri();
+        if ('POST' !== $this->qb->getMethod() || !str_ends_with($uri, '/_find') || 1 !== count($this->records)) {
+            return;
+        }
+
+        $body = json_decode($this->qb->getOptions()['body'] ?? '', true);
+        $query = $body['query'] ?? [];
+        if (1 !== count($query) || 1 !== count($query[0]) || !isset($this->records[0]['recordId'])) {
+            return;
+        }
+
+        $value = current($query[0]);
+        if (!is_scalar($value)) {
+            return;
+        }
+
+        $this->conn->rememberRecordId(
+            explode('/', $uri)[1],
+            (string)key($query[0]),
+            (string)preg_replace('/^==/', '', (string)$value),
+            (int)$this->records[0]['recordId']
+        );
     }
 
     /**
