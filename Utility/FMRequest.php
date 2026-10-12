@@ -83,7 +83,11 @@ class FMRequest
                 throw new FMException($e->getResponse()->getReasonPhrase(), $e->getResponse()->getStatusCode());
             }
 
-            if(401 === (int)$content->messages[0]->code) {
+            // If we're trying to get just one record and there are no records, we'll get a 101. If it's
+            // a general query with no results we'll get 401. A 101 on any other method (e.g. updating
+            // a record which has gone) is a real error and must not be hidden.
+            $code = (int)$content->messages[0]->code;
+            if(401 === $code || (101 === $code && 'GET' === strtoupper($method))) {
                 // no records found
                 return [];
             }
