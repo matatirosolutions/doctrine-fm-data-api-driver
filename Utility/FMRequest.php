@@ -38,7 +38,7 @@ class FMRequest
             $this->fetchToken();
         }
 
-        $client = new Client();
+        $client = $this->getClient();
         $headers = [
             'headers' => [
                 'Content-Type' => 'application/json',
@@ -119,6 +119,15 @@ class FMRequest
         return $this->token;
     }
 
+    private function getClient(): Client
+    {
+        return new Client([
+            'curl' => [
+                CURLOPT_SSLVERSION => CURL_SSLVERSION_TLSv1_2,
+            ],
+        ]);
+    }
+
     private function setBaseURL(): void
     {
         $this->baseURI =
@@ -144,7 +153,7 @@ class FMRequest
             return;
         }
 
-        $client = new Client();
+        $client = $this->getClient();
         try {
             $response = $client->request('POST', $this->baseURI . 'sessions', [
                 'headers' => [
