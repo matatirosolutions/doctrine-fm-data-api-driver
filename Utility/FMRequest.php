@@ -30,11 +30,14 @@ class FMRequest
         private readonly array $params
     ) {
         $this->setBaseURL();
-        $this->fetchToken();
     }
 
     public function performFMRequest(string $method, string $uri, array $options, bool $returnScriptResult = false): array
     {
+        if (null === $this->token) {
+            $this->fetchToken();
+        }
+
         $client = new Client();
         $headers = [
             'headers' => [
