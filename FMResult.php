@@ -92,7 +92,11 @@ class FMResult implements Result
                 continue;
             }
             if ('rec_meta' === $field['no_quotes']['parts'][1]) {
-                $resp[$field['alias']['no_quotes']['parts'][0]] = json_encode($this->metadata);
+                $resp[$field['alias']['no_quotes']['parts'][0]] = json_encode([
+                    'found' => $this->metadata['foundCount'] ?? 0,
+                    'fetch' => $this->metadata['returnedCount'] ?? 0,
+                    'total' => $this->metadata['totalRecordCount'] ?? 0,
+                ]);
                 continue;
             }
 

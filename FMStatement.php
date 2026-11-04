@@ -407,7 +407,7 @@ class FMStatement implements IteratorAggregate, Statement
      */
     private function getMetadataArray(): string
     {
-        $meta = $this->conn->getMetadata();
+        $meta = $this->metadata;
         return json_encode([
             'found' => $meta['foundCount'] ?? 0,
             'fetch' => $meta['returnedCount'] ?? 0,

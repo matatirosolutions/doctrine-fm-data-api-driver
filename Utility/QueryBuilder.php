@@ -425,7 +425,7 @@ class QueryBuilder
         return $sort;
     }
 
-    private function getOperator(string $request, string $parameter): string
+    private function getOperator(string $request, ?string $parameter): string
     {
         switch($request) {
             case '=':
