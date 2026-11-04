@@ -3,20 +3,35 @@
 namespace MSDev\DoctrineFMDataAPIDriver\Utility;
 
 use Doctrine\DBAL\Connection;
+use Exception;
 use MSDev\DoctrineFMDataAPIDriver\Exception\FMException;
-use MSDev\DoctrineFMDataAPIDriver\FMConnection;
+use Throwable;
 
 class SetGlobals
 {
 
-    /**
-     * @var FMRequest
-     */
-    protected $conn;
+    protected ?FMRequest $conn = null;
+
+    private bool $connectionAttempted = false;
+
+    private Connection $dbalConn;
 
     function __construct(Connection $conn)
     {
-        $this->conn = $conn->getNativeConnection();
+        $this->dbalConn = $conn;
+    }
+
+    private function getConn(): ?FMRequest
+    {
+        if (!$this->connectionAttempted) {
+            $this->connectionAttempted = true;
+            try {
+                $this->conn = $this->dbalConn->getNativeConnection();
+            } catch (Exception | Throwable $e) {
+                $this->conn = null;
+            }
+        }
+        return $this->conn;
     }
 
     /**
@@ -24,6 +39,11 @@ class SetGlobals
      */
     public function setGlobals(array $globals = []): array
     {
+        $conn = $this->getConn();
+        if(null === $conn) {
+            throw new FMException('No connection to FileMaker');
+        }
+
         $uri = 'globals';
         $opts = [
             'body' => json_encode([
@@ -31,7 +51,7 @@ class SetGlobals
             ])
         ];
         try {
-            return $this->conn->performFMRequest('PATCH', $uri, $opts);
+            return $conn->performFMRequest('PATCH', $uri, $opts);
         } catch(\Exception $e) {
             throw new FMException($e->getMessage(), $e->getCode());
         }

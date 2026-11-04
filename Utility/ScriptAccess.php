@@ -12,15 +12,28 @@ use Throwable;
 class ScriptAccess
 {
 
-    protected ?FMRequest $conn;
+    protected ?FMRequest $conn = null;
+
+    private bool $connectionAttempted = false;
+
+    private Connection $dbalConn;
 
     public function __construct(Connection $conn)
     {
-        try {
-            $this->conn = $conn->getNativeConnection();
-        } catch (Exception | Throwable $except) {
-            $this->conn = null;
+        $this->dbalConn = $conn;
+    }
+
+    private function getConn(): ?FMRequest
+    {
+        if (!$this->connectionAttempted) {
+            $this->connectionAttempted = true;
+            try {
+                $this->conn = $this->dbalConn->getNativeConnection();
+            } catch (Exception | Throwable $except) {
+                $this->conn = null;
+            }
         }
+        return $this->conn;
     }
 
 
@@ -35,7 +48,8 @@ class ScriptAccess
         bool $returnScriptResult = false
     ): array
     {
-        if(null === $this->conn) {
+        $conn = $this->getConn();
+        if(null === $conn) {
             throw new FMException('No connection to FileMaker');
         }
 
@@ -45,13 +59,13 @@ class ScriptAccess
         }
 
         try {
-            $scriptResult = $this->conn->performFMRequest('GET', $uri, [], $returnScriptResult);
+            $scriptResult = $conn->performFMRequest('GET', $uri, [], $returnScriptResult);
             if($returnScriptResult) {
                 return $scriptResult;
             }
 
             $uri = sprintf('/layouts/%s/records/%s', $layout, $recId);
-            $record = $this->conn->performFMRequest('GET', $uri, []);
+            $record = $conn->performFMRequest('GET', $uri, []);
 
             return $record[0]['fieldData'];
         } catch(Exception $e) {
@@ -64,13 +78,14 @@ class ScriptAccess
      */
     public function executeScript(string $layout, string $script, string $param = ''): array
     {
-        if(null === $this->conn) {
+        $conn = $this->getConn();
+        if(null === $conn) {
             throw new FMException('No connection to FileMaker');
         }
 
         $uri = sprintf('layouts/%s/script/%s?script.param=%s', $layout, $script, $param);
         try {
-            return $this->conn->performFMRequest('GET', $uri, [], true);
+            return $conn->performFMRequest('GET', $uri, [], true);
         } catch(Exception $e) {
             throw new FMException($e->getMessage(), $e->getCode());
         }

@@ -3,18 +3,21 @@
 namespace MSDev\DoctrineFMDataAPIDriver\Utility;
 
 use Doctrine\DBAL\Connection;
+use Exception;
 use GuzzleHttp\Exception\GuzzleException;
 use MSDev\DoctrineFMDataAPIDriver\Exception\FMException;
 use GuzzleHttp\Client;
+use Throwable;
 
 
 class ContainerAccess
 {
 
-    /**
-     * @var FMRequest
-     */
-    protected $con;
+    protected ?FMRequest $con = null;
+
+    private bool $connectionAttempted = false;
+
+    private Connection $dbalConn;
 
     /**
      * @var ScriptAccess
@@ -23,8 +26,21 @@ class ContainerAccess
 
     public function __construct(Connection $conn, ScriptAccess $script)
     {
-        $this->con = $conn->getNativeConnection();
+        $this->dbalConn = $conn;
         $this->script = $script;
+    }
+
+    private function getCon(): ?FMRequest
+    {
+        if (!$this->connectionAttempted) {
+            $this->connectionAttempted = true;
+            try {
+                $this->con = $this->dbalConn->getNativeConnection();
+            } catch (Exception | Throwable $e) {
+                $this->con = null;
+            }
+        }
+        return $this->con;
     }
 
     /**
@@ -110,10 +126,15 @@ class ContainerAccess
      */
     public function performContainerInsert($layout, $recId, $field, $file, $repetition = 1)
     {
+        $con = $this->getCon();
+        if(null === $con) {
+            throw new FMException('No connection to FileMaker');
+        }
+
         $uri = sprintf('layouts/%s/records/%s/containers/%s/%s', $layout, $recId, $field, $repetition);
         $options = [
             'headers' => [
-                'Authorization' => sprintf('Bearer %s', $this->con->getToken()),
+                'Authorization' => sprintf('Bearer %s', $con->getToken()),
             ],
             'multipart' => [
                 [
@@ -124,7 +145,7 @@ class ContainerAccess
         ];
 
         try {
-            return $this->con->performFMRequest('POST', $uri, $options);
+            return $con->performFMRequest('POST', $uri, $options);
         } catch(\Exception $e) {
             throw new FMException($e->getMessage(), $e->getCode());
         }
@@ -139,7 +160,7 @@ class ContainerAccess
      */
     private function generateURL($path)
     {
-        $params = $this->con->getParameters();
+        $params = $this->getCon()->getParameters();
         $url = parse_url($params['host']);
         $host = array_key_exists('host', $url)
             ? $url['host']
