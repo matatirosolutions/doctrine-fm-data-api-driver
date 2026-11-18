@@ -10,27 +10,31 @@ namespace MSDev\DoctrineFMDataAPIDriver\Utility;
 
 use Doctrine\DBAL\Connection;
 use MSDev\DoctrineFMDataAPIDriver\Exception\FMException;
-use MSDev\DoctrineFMDataAPIDriver\FMConnection;
-use GuzzleHttp\Client;
+use Symfony\Component\HttpClient\HttpClient;
+use Symfony\Contracts\HttpClient\Exception\ExceptionInterface;
+use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 
 class ContainerAccess
 {
 
     /**
-     * @var FMConnection
+     * @var FMRequest
      */
     protected $con;
+
+    private HttpClientInterface $client;
 
     /**
      * @var ScriptAccess
      */
     protected $script;
 
-    public function __construct(Connection $conn, ScriptAccess $script)
+    public function __construct(Connection $conn, ScriptAccess $script, ?HttpClientInterface $client = null)
     {
-        $this->con = $conn->getWrappedConnection();
+        $this->con = $conn->getNativeConnection();
         $this->script = $script;
+        $this->client = $client ?? HttpClient::create();
     }
 
     /**
@@ -43,13 +47,13 @@ class ContainerAccess
      * @throws FMException
      */
     public function getExternalContainerContent($path) {
-        $client = new Client();
-        $url = $this->generateURL($path);
+        [$url, $auth] = $this->generateURL($path);
 
         try {
-            $response = $client->get($url);
-            return $response->getBody()->getContents();
-        } catch (\Exception $e) {
+            $response = $this->client->request('GET', $url, $auth ? ['auth_basic' => $auth] : []);
+
+            return $this->contentOrFail($response->getStatusCode(), $response->getContent(false));
+        } catch (ExceptionInterface $e) {
             throw new FMException($e->getMessage(), $e->getCode());
         }
     }
@@ -57,19 +61,52 @@ class ContainerAccess
     /**
      * Retrieve DataAPI streamed content
      *
+     * The Data API hands back a URL which relies on a session cookie it sets on the first
+     * response, so cookies are carried across any redirects.
+     *
      * @param $url
      * @return string
      *
      * @throws FMException
      */
     public function getStreamedContainerContent($url) {
-        $client = new Client(['cookies' => true]);
+        $cookies = [];
+
         try {
-            $response = $client->get($url);
-            return $response->getBody()->getContents();
-        } catch (\Exception $e) {
+            for ($hop = 0; $hop < 5; $hop++) {
+                $options = ['max_redirects' => 0];
+                if ($cookies) {
+                    $options['headers'] = ['Cookie' => implode('; ', array_map(
+                        static fn($name, $value) => $name . '=' . $value,
+                        array_keys($cookies),
+                        $cookies
+                    ))];
+                }
+
+                $response = $this->client->request('GET', $url, $options);
+                $status = $response->getStatusCode();
+                $headers = $response->getHeaders(false);
+
+                foreach ($headers['set-cookie'] ?? [] as $cookie) {
+                    [$pair] = explode(';', $cookie, 2);
+                    if (str_contains($pair, '=')) {
+                        [$name, $value] = explode('=', $pair, 2);
+                        $cookies[trim($name)] = trim($value);
+                    }
+                }
+
+                if ($status >= 300 && $status < 400 && isset($headers['location'][0])) {
+                    $url = $this->resolveLocation($url, $headers['location'][0]);
+                    continue;
+                }
+
+                return $this->contentOrFail($status, $response->getContent(false));
+            }
+        } catch (ExceptionInterface $e) {
             throw new FMException($e->getMessage(), $e->getCode());
         }
+
+        throw new FMException('Too many redirects retrieving container content');
     }
 
     /**
@@ -116,20 +153,9 @@ class ContainerAccess
     public function performContainerInsert($layout, $recId, $field, $file, $repetition = 1)
     {
         $uri = sprintf('layouts/%s/records/%s/containers/%s/%s', $layout, $recId, $field, $repetition);
-        $options = [
-            'headers' => [
-                'Authorization' => sprintf('Bearer %s', $this->con->getToken()),
-            ],
-            'multipart' => [
-                [
-                    'name'     => 'upload',
-                    'contents' => fopen($file, 'r')
-                ],
-            ]
-        ];
 
         try {
-            return $this->con->performFMRequest('POST', $uri, $options);
+            return $this->con->performUpload($uri, $file);
         } catch(\Exception $e) {
             throw new FMException($e->getMessage(), $e->getCode());
         }
@@ -140,7 +166,7 @@ class ContainerAccess
      * and the passed FM path
      *
      * @param string $path
-     * @return string
+     * @return array{0: string, 1: array|null} The URL, and basic auth credentials if there are any
      */
     private function generateURL($path)
     {
@@ -158,10 +184,37 @@ class ContainerAccess
             $host .= ':'.$params['port'];
         }
 
-        $cred = empty($params['user'])
-            ? ''
-            : ((empty($params['password']) ? $params['user'] : $params['user'].':'.$params['password']).'@');
+        $auth = empty($params['user'])
+            ? null
+            : [$params['user'], $params['password'] ?? ''];
 
-        return $proto.$cred.$host.htmlspecialchars_decode($path);
+        return [$proto.$host.htmlspecialchars_decode($path), $auth];
+    }
+
+    /**
+     * @throws FMException
+     */
+    private function contentOrFail(int $status, string $content): string
+    {
+        if ($status >= 400) {
+            throw new FMException(sprintf('Unable to retrieve container content, HTTP status %d', $status), $status);
+        }
+
+        return $content;
+    }
+
+    private function resolveLocation(string $current, string $location): string
+    {
+        if (preg_match('#^https?://#i', $location)) {
+            return $location;
+        }
+
+        $base = parse_url($current);
+        $origin = $base['scheme'] . '://' . $base['host'] . (isset($base['port']) ? ':' . $base['port'] : '');
+        if (str_starts_with($location, '/')) {
+            return $origin . $location;
+        }
+
+        return $origin . rtrim(dirname($base['path'] ?? '/'), '/') . '/' . $location;
     }
 }

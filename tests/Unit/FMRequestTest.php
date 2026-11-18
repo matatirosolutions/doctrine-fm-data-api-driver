@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace MSDev\DoctrineFMDataAPIDriver\Tests\Unit;
 
-use GuzzleHttp\Psr7\Response;
 use MSDev\DoctrineFMDataAPIDriver\Exception\AuthenticationException;
 use MSDev\DoctrineFMDataAPIDriver\Exception\FMException;
 use MSDev\DoctrineFMDataAPIDriver\Tests\Support\MockFileMaker;
@@ -36,7 +35,7 @@ final class FMRequestTest extends TestCase
         $login = $this->fm->requests(true)[0];
         self::assertSame('POST', $login['method']);
         self::assertSame('sessions', $login['uri']);
-        self::assertSame(['Basic ' . base64_encode('tester:secret')], $login['headers']['Authorization']);
+        self::assertSame('Basic ' . base64_encode('tester:secret'), $login['headers']['Authorization']);
     }
 
     public function testBaseUriIsBuiltFromHostPortAndDatabase(): void
@@ -44,8 +43,7 @@ final class FMRequestTest extends TestCase
         $this->fm->queueLogin();
         $this->fm->request(['host' => 'fm.example.test', 'port' => 8443]);
 
-        $url = $this->fm->requests(true)[0]['headers']['Host'][0];
-        self::assertSame('fm.example.test:8443', $url);
+        self::assertStringStartsWith('https://fm.example.test:8443/fmi/data/v1/databases/TestDB/', $this->fm->requests(true)[0]['url']);
     }
 
     public function testSubsequentRequestsCarryTheBearerToken(): void
@@ -53,7 +51,7 @@ final class FMRequestTest extends TestCase
         $this->fm->queueLogin('abc123')->queueRecords([['recordId' => '1', 'modId' => '0', 'fieldData' => []]]);
         $this->fm->request()->performFMRequest('GET', 'layouts/Foo/records', []);
 
-        self::assertSame(['Bearer abc123'], $this->fm->lastRequest()['headers']['Authorization']);
+        self::assertSame('Bearer abc123', $this->fm->lastRequest()['headers']['Authorization']);
     }
 
     public function testReturnsTheDataMemberAndExposesDataInfoAsMetadata(): void
@@ -106,14 +104,14 @@ final class FMRequestTest extends TestCase
         self::assertCount(1, $result);
         $sent = $this->fm->requests(true);
         self::assertSame(['sessions', 'layouts/Foo/records', 'sessions', 'layouts/Foo/records'], array_column($sent, 'uri'));
-        self::assertSame(['Bearer new'], $sent[3]['headers']['Authorization']);
+        self::assertSame('Bearer new', $sent[3]['headers']['Authorization']);
     }
 
     public function testFmCloudHttp401TriggersARefresh(): void
     {
         // FileMaker Cloud answers an expired token with HTTP 401 and no FM error body
         $this->fm->queueLogin('old')
-            ->queueRaw(new Response(401, [], ''))
+            ->queueHttp(401)
             ->queueLogin('new')
             ->queueRecords([]);
 
@@ -164,7 +162,7 @@ final class FMRequestTest extends TestCase
 
     public function testNonJsonErrorBodyFallsBackToTheHttpReasonPhrase(): void
     {
-        $this->fm->queueLogin()->queueRaw(new Response(502, [], 'not json', '1.1', 'Bad Gateway'));
+        $this->fm->queueLogin()->queueHttp(502, 'not json', 'Bad Gateway');
 
         $this->expectException(FMException::class);
         $this->expectExceptionMessage('Bad Gateway');
@@ -184,7 +182,7 @@ final class FMRequestTest extends TestCase
 
     public function testMissingDatabaseOnLoginIsAnAuthenticationException(): void
     {
-        $this->fm->queueRaw(new Response(404, [], '', '1.1', 'Not Found'));
+        $this->fm->queueHttp(404, '', 'Not Found');
 
         $this->expectException(AuthenticationException::class);
         $this->expectExceptionMessage('Not Found');
@@ -204,6 +202,102 @@ final class FMRequestTest extends TestCase
         $second->request()->performFMRequest('GET', 'layouts/Foo/records', []);
 
         self::assertSame([], array_filter($second->requests(true), static fn ($r) => 'sessions' === $r['uri']));
-        self::assertSame(['Bearer cached'], $second->lastRequest()['headers']['Authorization']);
+        self::assertSame('Bearer cached', $second->lastRequest()['headers']['Authorization']);
+    }
+
+    public function testEachRequestGetsItsOwnTokenRefresh(): void
+    {
+        $this->fm->queueLogin('t1')
+            ->queueError(952, 'Invalid FileMaker Data API token (*)')->queueLogin('t2')->queueRecords([])
+            ->queueError(952, 'Invalid FileMaker Data API token (*)')->queueLogin('t3')->queueRecords([]);
+
+        $request = $this->fm->request();
+        $request->performFMRequest('GET', 'layouts/Foo/records', []);
+        $request->performFMRequest('GET', 'layouts/Foo/records', []);
+
+        self::assertSame(0, $this->fm->remainingResponses());
+        self::assertSame('t3', $request->getToken());
+    }
+
+    public function testScriptResultIsStillReturnedAfterATokenRefresh(): void
+    {
+        $this->fm->queueLogin()
+            ->queueError(952, 'Invalid FileMaker Data API token (*)')
+            ->queueLogin()
+            ->queueResponse(['scriptError' => '0', 'scriptResult' => 'done']);
+
+        $result = $this->fm->request()->performFMRequest('GET', 'layouts/Foo/script/Bar', [], true);
+
+        self::assertSame(['error' => '0', 'result' => 'done'], $result);
+    }
+
+    public function testNetworkFailureIsAnFMException(): void
+    {
+        $this->fm->queueLogin()->queueTransportError('Connection refused');
+
+        $this->expectException(FMException::class);
+        $this->expectExceptionMessage('Connection refused');
+
+        $this->fm->request()->performFMRequest('GET', 'layouts/Foo/records', []);
+    }
+
+    public function testNetworkFailureOnLoginIsAnAuthenticationException(): void
+    {
+        $this->fm->queueTransportError('Could not resolve host');
+
+        $this->expectException(AuthenticationException::class);
+        $this->expectExceptionMessage('Could not resolve host');
+
+        $this->fm->request();
+    }
+
+    public function testCallerHeadersAreMergedCaseInsensitivelyOverTheDefaults(): void
+    {
+        $this->fm->queueLogin()->queueRecords([]);
+
+        $this->fm->request()->performFMRequest('GET', 'layouts/Foo/records', ['headers' => ['content-type' => 'text/plain', 'X-Extra' => '1']]);
+
+        $headers = $this->fm->lastRequest()['headers'];
+        self::assertSame('text/plain', $headers['Content-Type'] ?? $headers['content-type']);
+        self::assertSame('1', $headers['X-Extra']);
+        self::assertCount(1, array_filter(array_keys($headers), static fn ($h) => 'content-type' === strtolower($h)));
+    }
+
+    public function testUploadsAreSentAsMultipartFormData(): void
+    {
+        $file = tempnam(sys_get_temp_dir(), 'fmup');
+        file_put_contents($file, 'hello');
+        $this->fm->queueLogin()->queueResponse(['modId' => '1']);
+
+        try {
+            $result = $this->fm->request()->performUpload('layouts/Foo/records/9/containers/Photo/1', $file);
+        } finally {
+            unlink($file);
+        }
+
+        $req = $this->fm->lastRequest();
+        self::assertSame(['modId' => '1'], $result);
+        self::assertSame('POST', $req['method']);
+        self::assertSame('layouts/Foo/records/9/containers/Photo/1', $req['uri']);
+        self::assertStringStartsWith('multipart/form-data; boundary=', $req['headers']['Content-Type']);
+    }
+
+    public function testUploadsSurviveATokenRefresh(): void
+    {
+        $file = tempnam(sys_get_temp_dir(), 'fmup');
+        file_put_contents($file, 'hello');
+        $this->fm->queueLogin()
+            ->queueError(952, 'Invalid FileMaker Data API token (*)')
+            ->queueLogin()
+            ->queueResponse(['modId' => '1']);
+
+        try {
+            $result = $this->fm->request()->performUpload('layouts/Foo/records/9/containers/Photo/1', $file);
+        } finally {
+            unlink($file);
+        }
+
+        self::assertSame(['modId' => '1'], $result);
+        self::assertSame(0, $this->fm->remainingResponses());
     }
 }

@@ -4,16 +4,12 @@ declare(strict_types=1);
 
 namespace MSDev\DoctrineFMDataAPIDriver\Tests\Support;
 
-use GuzzleHttp\Client;
-use GuzzleHttp\Handler\MockHandler;
-use GuzzleHttp\HandlerStack;
-use GuzzleHttp\Middleware;
-use GuzzleHttp\Psr7\Response;
 use MSDev\DoctrineFMDataAPIDriver\FMConnection;
-use MSDev\DoctrineFMDataAPIDriver\FMDriver;
 use MSDev\DoctrineFMDataAPIDriver\Utility\FMRequest;
-use Psr\Http\Message\RequestInterface;
 use ReflectionClass;
+use Symfony\Component\HttpClient\MockHttpClient;
+use Symfony\Component\HttpClient\Response\MockResponse;
+use Symfony\Contracts\HttpClient\ResponseInterface;
 
 /**
  * A stand-in for a FileMaker Server Data API.
@@ -32,19 +28,23 @@ final class MockFileMaker
         'password' => 'secret',
     ];
 
-    private MockHandler $handler;
+    private const BASE_PATH = '/fmi/data/v1/databases/' . self::PARAMS['dbname'] . '/';
 
-    /** @var array<int, array{request: RequestInterface, response: ?Response}> */
+    /** @var list<MockResponse> */
+    private array $queue = [];
+
+    /** @var list<array{method: string, url: string, options: array}> */
     private array $history = [];
 
-    private Client $client;
+    private MockHttpClient $client;
 
     public function __construct()
     {
-        $this->handler = new MockHandler();
-        $stack = HandlerStack::create($this->handler);
-        $stack->push(Middleware::history($this->history));
-        $this->client = new Client(['handler' => $stack]);
+        $this->client = new MockHttpClient(function (string $method, string $url, array $options): ResponseInterface {
+            $this->history[] = ['method' => $method, 'url' => $url, 'options' => $options];
+
+            return array_shift($this->queue) ?? throw new \LogicException(sprintf('No response queued for %s %s', $method, $url));
+        });
 
         // The driver caches its Data API token in the system temp dir; make sure
         // a stale one never short-circuits the login request in a test.
@@ -63,7 +63,7 @@ final class MockFileMaker
         @unlink(self::tokenCacheFile());
     }
 
-    public function client(): Client
+    public function client(): MockHttpClient
     {
         return $this->client;
     }
@@ -105,16 +105,32 @@ final class MockFileMaker
         return $this->queueJson(['messages' => [['code' => (string) $fmCode, 'message' => $message]]], $status);
     }
 
-    public function queueRaw(Response $response): self
+    /** Queue a bare HTTP response, with no FileMaker JSON envelope. */
+    public function queueHttp(int $status, string $body = '', ?string $reason = null, array $headers = []): self
     {
-        $this->handler->append($response);
+        $responseHeaders = $headers;
+        if (null !== $reason) {
+            array_unshift($responseHeaders, sprintf('HTTP/1.1 %d %s', $status, $reason));
+        }
+        $this->queue[] = new MockResponse($body, ['http_code' => $status, 'response_headers' => $responseHeaders]);
+
+        return $this;
+    }
+
+    /** Queue a network level failure (connection refused, timeout, ...). */
+    public function queueTransportError(string $message = 'Connection refused'): self
+    {
+        $this->queue[] = new MockResponse('', ['error' => $message]);
 
         return $this;
     }
 
     public function queueJson(array $body, int $status = 200): self
     {
-        $this->handler->append(new Response($status, ['Content-Type' => 'application/json'], json_encode($body, JSON_THROW_ON_ERROR)));
+        $this->queue[] = new MockResponse(json_encode($body, JSON_THROW_ON_ERROR), [
+            'http_code' => $status,
+            'response_headers' => ['Content-Type: application/json'],
+        ]);
 
         return $this;
     }
@@ -139,28 +155,51 @@ final class MockFileMaker
     }
 
     /**
-     * Everything sent after the login call.
+     * Every request sent to the Data API, in order. Login calls are left out unless asked for.
      *
-     * @return list<array{method: string, uri: string, query: array, body: mixed, headers: array}>
+     * @return list<array{method: string, url: string, uri: string, query: array, body: mixed, headers: array<string, string>}>
      */
     public function requests(bool $includeLogin = false): array
     {
         $out = [];
         foreach ($this->history as $entry) {
-            /** @var RequestInterface $req */
-            $req = $entry['request'];
-            if (!$includeLogin && str_ends_with($req->getUri()->getPath(), '/sessions')) {
+            $url = parse_url($entry['url']);
+            $path = $url['path'] ?? '';
+            $isDataApi = str_starts_with($path, self::BASE_PATH);
+            if ($isDataApi && !$includeLogin && 'sessions' === substr($path, strlen(self::BASE_PATH))) {
                 continue;
             }
-            parse_str($req->getUri()->getQuery(), $query);
-            $raw = (string) $req->getBody();
+
+            $query = self::parseQuery($url['query'] ?? '');
+            $headers = [];
+            foreach ($entry['options']['normalized_headers'] ?? [] as $lines) {
+                foreach ($lines as $line) {
+                    [$name, $value] = explode(':', $line, 2);
+                    $headers[$name] = trim($value);
+                }
+            }
+            $raw = $entry['options']['body'] ?? '';
+
             $out[] = [
-                'method' => $req->getMethod(),
-                'uri' => ltrim(substr($req->getUri()->getPath(), strpos($req->getUri()->getPath(), '/databases/' . self::PARAMS['dbname'] . '/') + strlen('/databases/' . self::PARAMS['dbname'] . '/')), '/'),
+                'method' => $entry['method'],
+                'url' => $entry['url'],
+                'uri' => $isDataApi ? substr($path, strlen(self::BASE_PATH)) : ltrim($path, '/'),
                 'query' => $query,
-                'body' => $raw === '' ? null : json_decode($raw, true),
-                'headers' => $req->getHeaders(),
+                'body' => is_string($raw) && '' !== $raw ? (json_decode($raw, true) ?? $raw) : null,
+                'headers' => $headers,
             ];
+        }
+
+        return $out;
+    }
+
+    /** Like parse_str(), but without PHP mangling dots in names (script.param). */
+    private static function parseQuery(string $query): array
+    {
+        $out = [];
+        foreach ('' === $query ? [] : explode('&', $query) as $pair) {
+            [$name, $value] = array_pad(explode('=', $pair, 2), 2, '');
+            $out[urldecode($name)] = urldecode($value);
         }
 
         return $out;
@@ -175,6 +214,6 @@ final class MockFileMaker
 
     public function remainingResponses(): int
     {
-        return $this->handler->count();
+        return count($this->queue);
     }
 }

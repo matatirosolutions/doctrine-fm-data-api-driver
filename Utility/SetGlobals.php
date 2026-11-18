@@ -10,13 +10,12 @@ namespace MSDev\DoctrineFMDataAPIDriver\Utility;
 
 use Doctrine\DBAL\Connection;
 use MSDev\DoctrineFMDataAPIDriver\Exception\FMException;
-use MSDev\DoctrineFMDataAPIDriver\FMConnection;
 
 class SetGlobals
 {
 
     /**
-     * @var FMConnection
+     * @var FMRequest
      */
     protected $conn;
 
@@ -26,7 +25,7 @@ class SetGlobals
      */
     function __construct(Connection $conn)
     {
-        $this->conn = $conn->getWrappedConnection();
+        $this->conn = $conn->getNativeConnection();
     }
 
 
