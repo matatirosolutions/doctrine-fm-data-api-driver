@@ -6,7 +6,7 @@ on:
 
 jobs:
   phpunit:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
@@ -27,7 +27,7 @@ jobs:
     name: PHP ${{ matrix.php }} / Symfony ${{ matrix.symfony }} / ${{ matrix.deps }} deps
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: shivammathur/setup-php@v2
         with:
