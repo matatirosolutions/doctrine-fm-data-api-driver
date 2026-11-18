@@ -30,7 +30,7 @@ final class FMRequestTest extends TestCase
     public function testLogsInWithBasicAuthAgainstSessionsEndpoint(): void
     {
         $this->fm->queueLogin();
-        $this->fm->request();
+        $this->fm->request()->getToken();
 
         $login = $this->fm->requests(true)[0];
         self::assertSame('POST', $login['method']);
@@ -41,7 +41,7 @@ final class FMRequestTest extends TestCase
     public function testBaseUriIsBuiltFromHostPortAndDatabase(): void
     {
         $this->fm->queueLogin();
-        $this->fm->request(['host' => 'fm.example.test', 'port' => 8443]);
+        $this->fm->request(['host' => 'fm.example.test', 'port' => 8443])->getToken();
 
         self::assertStringStartsWith('https://fm.example.test:8443/fmi/data/v1/databases/TestDB/', $this->fm->requests(true)[0]['url']);
     }
@@ -49,7 +49,7 @@ final class FMRequestTest extends TestCase
     public function testAHostWhichIncludesASchemeIsUsedAsGiven(): void
     {
         $this->fm->queueLogin();
-        $this->fm->request(['host' => 'http://fm.example.test', 'port' => 80]);
+        $this->fm->request(['host' => 'http://fm.example.test', 'port' => 80])->getToken();
 
         self::assertStringStartsWith('http://fm.example.test/fmi/data/v1/databases/TestDB/', $this->fm->requests(true)[0]['url']);
     }
@@ -185,7 +185,7 @@ final class FMRequestTest extends TestCase
         $this->expectException(AuthenticationException::class);
         $this->expectExceptionMessage('Invalid user account');
 
-        $this->fm->request();
+        $this->fm->request()->getToken();
     }
 
     public function testMissingDatabaseOnLoginIsAnAuthenticationException(): void
@@ -195,7 +195,7 @@ final class FMRequestTest extends TestCase
         $this->expectException(AuthenticationException::class);
         $this->expectExceptionMessage('Not Found');
 
-        $this->fm->request();
+        $this->fm->request()->getToken();
     }
 
     public function testCachedTokenIsReusedWithoutLoggingInAgain(): void
@@ -256,7 +256,80 @@ final class FMRequestTest extends TestCase
         $this->expectException(AuthenticationException::class);
         $this->expectExceptionMessage('Could not resolve host');
 
-        $this->fm->request();
+        $this->fm->request()->getToken();
+    }
+
+    public function testNothingIsSentUntilTheFirstRequest(): void
+    {
+        $this->fm->queueLogin('lazy-token')->queueRecords([['recordId' => '1', 'modId' => '0', 'fieldData' => []]]);
+
+        $request = $this->fm->request();
+        self::assertCount(0, $this->fm->requests(true), 'creating the request object does not log in');
+
+        $request->performFMRequest('GET', 'layouts/Foo/records', []);
+
+        $all = $this->fm->requests(true);
+        self::assertSame(['sessions', 'layouts/Foo/records'], array_column($all, 'uri'));
+        self::assertSame('Bearer lazy-token', $all[1]['headers']['Authorization']);
+    }
+
+    public function testGetTokenLogsInIfNecessaryAndOnlyOnce(): void
+    {
+        $this->fm->queueLogin('abc');
+        $request = $this->fm->request();
+
+        self::assertSame('abc', $request->getToken());
+        self::assertSame('abc', $request->getToken());
+        self::assertCount(1, $this->fm->requests(true));
+    }
+
+    public function testNoRecordOnASingleRecordGetIsAnEmptyResult(): void
+    {
+        $this->fm->queueLogin()->queueError(101, 'Record is missing', 404);
+
+        self::assertSame([], $this->fm->request()->performFMRequest('GET', 'layouts/Foo/records/99', []));
+    }
+
+    public function testMissingRecordOnAnythingButAGetIsARealError(): void
+    {
+        $this->fm->queueLogin()->queueError(101, 'Record is missing', 404);
+
+        try {
+            $this->fm->request()->performFMRequest('PATCH', 'layouts/Foo/records/99', ['body' => '{}']);
+            self::fail('Expected an FMException');
+        } catch (FMException $e) {
+            self::assertSame(101, $e->getCode());
+        }
+    }
+
+    public function testInvalidUtf8InAResponseIsSubstitutedRatherThanFatal(): void
+    {
+        $this->fm->queueLogin()->queueHttp(200, "{\"response\":{\"data\":[{\"fieldData\":{\"a\":\"x\xB1y\"}}]},\"messages\":[{\"code\":\"0\",\"message\":\"OK\"}]}");
+
+        $data = $this->fm->request()->performFMRequest('GET', 'layouts/Foo/records', []);
+
+        self::assertSame("x\u{FFFD}y", $data[0]['fieldData']['a']);
+    }
+
+    public function testAMalformedHostIsAnAuthenticationFailureNotAnUncaughtError(): void
+    {
+        $this->expectException(AuthenticationException::class);
+        $this->expectExceptionMessage('Malformed URL');
+
+        $this->fm->request(['host' => ''])->getToken();
+    }
+
+    public function testAMalformedRequestUrlIsAnFMException(): void
+    {
+        $this->fm->queueLogin();
+        $request = $this->fm->request();
+        $request->getToken();
+
+        $this->expectException(FMException::class);
+        $this->expectExceptionMessage('Malformed URL');
+
+        // A script parameter with a line break in it which nobody encoded, say
+        $request->performFMRequest('GET', "layouts/Foo/script/Bar?script.param=a\nb", []);
     }
 
     public function testCallerHeadersAreMergedCaseInsensitivelyOverTheDefaults(): void

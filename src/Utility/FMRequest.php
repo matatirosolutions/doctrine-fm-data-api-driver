@@ -2,6 +2,7 @@
 
 namespace MSDev\DoctrineFMDataAPIDriver\Utility;
 
+use InvalidArgumentException;
 use JsonException;
 use MSDev\DoctrineFMDataAPIDriver\Exception\AuthenticationException;
 use MSDev\DoctrineFMDataAPIDriver\Exception\FMException;
@@ -42,7 +43,8 @@ class FMRequest
     private ?string $baseURI = null;
 
     /**
-     * @throws AuthenticationException
+     * Nothing is sent until the first request: logging in is deferred so that creating a connection (and the
+     * services which wrap one) costs nothing when it turns out not to be used.
      */
     public function __construct(
         private readonly array $params,
@@ -50,7 +52,6 @@ class FMRequest
     ) {
         $this->client = $client ?? HttpClientFactory::create($params);
         $this->setBaseURL();
-        $this->fetchToken();
     }
 
     /**
@@ -90,8 +91,15 @@ class FMRequest
         return $this->metadata;
     }
 
+    /**
+     * The session token, logging in first if there isn't one yet.
+     *
+     * @throws AuthenticationException
+     */
     public function getToken(): ?string
     {
+        $this->ensureToken();
+
         return $this->token;
     }
 
@@ -114,7 +122,7 @@ class FMRequest
 
             if ($status >= 200 && $status < 300) {
                 try {
-                    $content = json_decode($body, true, 512, JSON_THROW_ON_ERROR);
+                    $content = json_decode($body, true, 512, JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE);
                 } catch (JsonException $e) {
                     throw new FMException('Unreadable response from FileMaker: ' . $e->getMessage(), 0, $e);
                 }
@@ -148,9 +156,11 @@ class FMRequest
                 throw new FMException($this->reasonPhrase($response), $status);
             }
 
+            // Asking for one record which isn't there gives 101, and a query which finds nothing gives 401. Either
+            // way there are no records. A 101 for any other method (updating a record which has gone, say) is a
+            // real error and must not be hidden.
             $fmCode = (int)$content->messages[0]->code;
-            if (401 === $fmCode) {
-                // no records found
+            if (401 === $fmCode || (101 === $fmCode && 'GET' === strtoupper($method))) {
                 return [];
             }
 
@@ -173,6 +183,7 @@ class FMRequest
      */
     private function send(string $method, string $uri, array $options): array
     {
+        $this->ensureToken();
         $options['headers'] = $this->mergeHeaders(['Content-Type' => 'application/json'], $options['headers'] ?? []);
         $options['auth_bearer'] = $this->token;
 
@@ -181,8 +192,9 @@ class FMRequest
 
             // Responses are lazy, so this is where the request really happens
             return [$response, $response->getStatusCode(), $response->getContent(false)];
-        } catch (TransportExceptionInterface $e) {
-            throw new FMException($e->getMessage(), $e->getCode(), $e);
+        } catch (TransportExceptionInterface | InvalidArgumentException $e) {
+            // The latter is a malformed URL, e.g. a host which isn't one
+            throw new FMException($e->getMessage(), (int)$e->getCode(), $e);
         }
     }
 
@@ -233,6 +245,16 @@ class FMRequest
     /**
      * @throws AuthenticationException
      */
+    private function ensureToken(): void
+    {
+        if (null === $this->token) {
+            $this->fetchToken();
+        }
+    }
+
+    /**
+     * @throws AuthenticationException
+     */
     private function fetchToken(): void
     {
         if($token = $this->readTokenFromDisk()) {
@@ -252,8 +274,8 @@ class FMRequest
             ]);
             $status = $response->getStatusCode();
             $body = $response->getContent(false);
-        } catch (TransportExceptionInterface $e) {
-            throw new AuthenticationException($e->getMessage(), $e->getCode(), $e);
+        } catch (TransportExceptionInterface | InvalidArgumentException $e) {
+            throw new AuthenticationException($e->getMessage(), (int)$e->getCode(), $e);
         }
 
         if ($status >= 400) {

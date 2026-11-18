@@ -25,13 +25,29 @@ class ConnectionTest extends FunctionalTestCase
             DriverManager::getConnection($this->connectionParams([
                 'user' => 'nobody',
                 'password' => 'definitely-not-the-password',
-            ]))->getNativeConnection();
+            ]))->getNativeConnection()->getToken();
             self::fail('Expected an AuthenticationException');
         } catch (AuthenticationException $e) {
             self::assertSame(212, $e->getCode(), 'FileMaker 212: invalid account or password');
         } finally {
             MockFileMaker::clearTokenCache();
         }
+    }
+
+    public function testNothingIsSentUntilTheFirstRequest(): void
+    {
+        MockFileMaker::clearTokenCache();
+
+        // Wrong credentials, which would fail if anything tried to log in
+        $connection = DriverManager::getConnection($this->connectionParams(['password' => 'definitely-not-the-password']));
+
+        self::assertNotNull($connection->getNativeConnection());
+        MockFileMaker::clearTokenCache();
+    }
+
+    public function testASingleRecordWhichDoesNotExistIsNoRecordsNotAnError(): void
+    {
+        self::assertSame([], $this->request()->performFMRequest('GET', 'layouts/API_Keyword/records/999999999', []));
     }
 
     public function testUnknownLayoutIsAnFMExceptionWithFileMakersCode(): void

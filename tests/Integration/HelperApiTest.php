@@ -27,6 +27,15 @@ final class HelperApiTest extends OrmTestCase
         return new ContainerAccess($this->em->getConnection(), $this->scripts(), $this->fm->client());
     }
 
+    public function testCreatingTheHelpersCostsNothing(): void
+    {
+        $scripts = $this->scripts();
+        new SetGlobals($this->em->getConnection());
+        new ContainerAccess($this->em->getConnection(), $scripts);
+
+        self::assertCount(0, $this->fm->requests(true), 'no login, no requests');
+    }
+
     // ScriptAccess
 
     public function testExecuteScriptRunsAScriptOnALayoutAndReturnsItsResult(): void
@@ -112,6 +121,8 @@ final class HelperApiTest extends OrmTestCase
 
     public function testExternalContainerContentIsFetchedFromTheHostWithBasicAuth(): void
     {
+        // Fetching container content never touches the Data API session, so no login is needed
+        $this->fm->clearQueue();
         $this->fm->queueHttp(200, 'JPEGDATA');
 
         $content = $this->containers()->getExternalContainerContent('/Streaming_SSL/MainDB/photo.jpg?a=1&amp;b=2');
@@ -127,6 +138,8 @@ final class HelperApiTest extends OrmTestCase
 
     public function testExternalContainerFailuresAreFMExceptions(): void
     {
+        // Fetching container content never touches the Data API session, so no login is needed
+        $this->fm->clearQueue();
         $this->fm->queueHttp(404);
 
         $this->expectException(FMException::class);
@@ -136,6 +149,8 @@ final class HelperApiTest extends OrmTestCase
 
     public function testStreamedContainerContentCarriesTheSessionCookieAcrossRedirects(): void
     {
+        // Fetching container content never touches the Data API session, so no login is needed
+        $this->fm->clearQueue();
         $this->fm->queueHttp(302, '', null, ['Location: https://fm.example.test/stream/real', 'Set-Cookie: X-FM-Data-Access-Token=abc; Path=/; HttpOnly'])
             ->queueHttp(200, 'BINARY');
 
@@ -150,6 +165,8 @@ final class HelperApiTest extends OrmTestCase
 
     public function testStreamedContainerContentWithoutRedirectsIsReturnedDirectly(): void
     {
+        // Fetching container content never touches the Data API session, so no login is needed
+        $this->fm->clearQueue();
         $this->fm->queueHttp(200, 'BINARY');
 
         self::assertSame('BINARY', $this->containers()->getStreamedContainerContent('https://fm.example.test/stream/start'));

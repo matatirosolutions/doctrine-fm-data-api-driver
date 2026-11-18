@@ -63,6 +63,14 @@ final class MockFileMaker
         @unlink(self::tokenCacheFile());
     }
 
+    /** Forget everything queued so far, e.g. the login a test won't need because it never reaches FileMaker. */
+    public function clearQueue(): self
+    {
+        $this->queue = [];
+
+        return $this;
+    }
+
     public function client(): MockHttpClient
     {
         return $this->client;

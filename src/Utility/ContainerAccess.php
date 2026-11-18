@@ -17,23 +17,54 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
 class ContainerAccess
 {
 
-    /**
-     * @var FMRequest
-     */
-    protected $con;
+    protected ?FMRequest $con = null;
 
-    private HttpClientInterface $client;
+    private bool $connectionAttempted = false;
+
+    private Connection $dbalConn;
+
+    private ?HttpClientInterface $client;
 
     /**
      * @var ScriptAccess
      */
     protected $script;
 
+    /**
+     * The connection and the HTTP client are only set up when first needed, so creating this has no side effects.
+     */
     public function __construct(Connection $conn, ScriptAccess $script, ?HttpClientInterface $client = null)
     {
-        $this->con = $conn->getNativeConnection();
+        $this->dbalConn = $conn;
         $this->script = $script;
-        $this->client = $client ?? HttpClientFactory::create($this->con instanceof FMRequest ? $this->con->getParameters() : []);
+        $this->client = $client;
+    }
+
+    private function getCon(): ?FMRequest
+    {
+        if (!$this->connectionAttempted) {
+            $this->connectionAttempted = true;
+            try {
+                $this->con = $this->dbalConn->getNativeConnection();
+            } catch (\Throwable) {
+                $this->con = null;
+            }
+        }
+
+        return $this->con;
+    }
+
+    /**
+     * @throws FMException
+     */
+    private function requireCon(): FMRequest
+    {
+        return $this->getCon() ?? throw new FMException('No connection to FileMaker');
+    }
+
+    private function client(): HttpClientInterface
+    {
+        return $this->client ??= HttpClientFactory::create($this->getCon()?->getParameters() ?? []);
     }
 
     /**
@@ -45,11 +76,12 @@ class ContainerAccess
      *
      * @throws FMException
      */
-    public function getExternalContainerContent($path) {
+    public function getExternalContainerContent(string $path): string
+    {
         [$url, $auth] = $this->generateURL($path);
 
         try {
-            $response = $this->client->request('GET', $url, $auth ? ['auth_basic' => $auth] : []);
+            $response = $this->client()->request('GET', $url, $auth ? ['auth_basic' => $auth] : []);
 
             return $this->contentOrFail($response->getStatusCode(), $response->getContent(false));
         } catch (ExceptionInterface $e) {
@@ -82,7 +114,7 @@ class ContainerAccess
                     ))];
                 }
 
-                $response = $this->client->request('GET', $url, $options);
+                $response = $this->client()->request('GET', $url, $options);
                 $status = $response->getStatusCode();
                 $headers = $response->getHeaders(false);
 
@@ -154,7 +186,7 @@ class ContainerAccess
         $uri = sprintf('layouts/%s/records/%s/containers/%s/%s', $layout, $recId, $field, $repetition);
 
         try {
-            return $this->con->performUpload($uri, $file);
+            return $this->requireCon()->performUpload($uri, $file);
         } catch(\Exception $e) {
             throw new FMException($e->getMessage(), $e->getCode());
         }
@@ -169,7 +201,7 @@ class ContainerAccess
      */
     private function generateURL($path)
     {
-        $params = $this->con->getParameters();
+        $params = $this->requireCon()->getParameters();
         $url = parse_url($params['host']);
         $host = array_key_exists('host', $url)
             ? $url['host']

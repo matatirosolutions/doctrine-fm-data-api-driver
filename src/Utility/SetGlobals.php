@@ -1,43 +1,53 @@
 <?php
-/**
- * Created by PhpStorm.
- * User: SteveWinter
- * Date: 10/04/2017
- * Time: 15:10
- */
 
 namespace MSDev\DoctrineFMDataAPIDriver\Utility;
 
 use Doctrine\DBAL\Connection;
+use Exception;
 use MSDev\DoctrineFMDataAPIDriver\Exception\FMException;
+use Throwable;
 
 class SetGlobals
 {
 
-    /**
-     * @var FMRequest
-     */
-    protected $conn;
+    protected ?FMRequest $conn = null;
+
+    private bool $connectionAttempted = false;
+
+    private Connection $dbalConn;
 
     /**
-     * ScriptAccess constructor.
-     * @param Connection $conn
+     * The connection is only looked up when it is first needed, so creating this has no side effects.
      */
     function __construct(Connection $conn)
     {
-        $this->conn = $conn->getNativeConnection();
+        $this->dbalConn = $conn;
     }
 
+    private function getConn(): ?FMRequest
+    {
+        if (!$this->connectionAttempted) {
+            $this->connectionAttempted = true;
+            try {
+                $this->conn = $this->dbalConn->getNativeConnection();
+            } catch (Exception | Throwable $e) {
+                $this->conn = null;
+            }
+        }
+
+        return $this->conn;
+    }
 
     /**
-     * @param array $globals
-     *
-     * @return array
-     *
      * @throws FMException
      */
-    public function setGlobals($globals = [])
+    public function setGlobals(array $globals = []): array
     {
+        $conn = $this->getConn();
+        if(null === $conn) {
+            throw new FMException('No connection to FileMaker');
+        }
+
         $uri = 'globals';
         $opts = [
             'body' => json_encode([
@@ -45,7 +55,7 @@ class SetGlobals
             ])
         ];
         try {
-            return $this->conn->performFMRequest('PATCH', $uri, $opts);
+            return $conn->performFMRequest('PATCH', $uri, $opts);
         } catch(\Exception $e) {
             throw new FMException($e->getMessage(), $e->getCode());
         }
