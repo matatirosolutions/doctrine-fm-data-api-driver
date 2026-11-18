@@ -46,16 +46,18 @@ doctrine:
 * `http_client` - your own `Symfony\Contracts\HttpClient\HttpClientInterface`, if you need full control (a PHP object, so only
   possible when you build the connection in code). Otherwise the driver creates a client with `HttpClient::create()`.
 * `http_client_options` - default request options for the client the driver creates.
-* `max_tls_version` - never negotiate a TLS version above this one (`1.2`, say).
+* `max_tls_version` - never negotiate a TLS version above this one. Defaults to `'1.2'` when `ext-curl` is loaded. Set it to `null`
+  or `'none'` to turn the cap off and use the standard Symfony client.
 
-**When to use `max_tls_version`.** Some servers can't cope with the TLS handshake of recent OpenSSL builds (OpenSSL 4, which
+**About `max_tls_version`.** Some servers can't cope with the TLS handshake of recent OpenSSL builds (OpenSSL 4, which
 current PHP builds can link against) and drop the connection with `tlsv1 alert decode error`, on every request, while older clients
-work. Symfony's HTTP clients can only set a *minimum* TLS version, so with this option the driver makes its requests through its own
-small curl-based client (`MaxTlsHttpClient`, needs `ext-curl`) which can cap it. The helper classes use the same client.
+work. Symfony's HTTP clients can only set a *minimum* TLS version, so unless you turn it off the driver makes its requests through its
+own small curl-based client (`MaxTlsHttpClient`, needs `ext-curl`) which can cap it. The helper classes use the same client. A server
+which handles TLS 1.3 fine loses nothing by the cap; set `max_tls_version: null` if you'd rather have it.
 
 ### Types ###
 
-The driver ships with types for FileMaker's date, time and timestamp formats, and for HTML encoded text and PHP
+The driver ships with types for FileMaker's date, time and timestamp formats, for numbers, and for HTML encoded text and PHP
 arrays. Register those you need under whatever names you like:
 
 ```yaml
@@ -65,9 +67,14 @@ doctrine:
             fmdatetime: MSDev\DoctrineFMDataAPIDriver\Types\FMDateTimeType   # m/d/Y H:i:s
             fmdate: MSDev\DoctrineFMDataAPIDriver\Types\FMDateType           # m/d/Y
             fmtime: MSDev\DoctrineFMDataAPIDriver\Types\FMTimeType           # H:i
+            fmint: MSDev\DoctrineFMDataAPIDriver\Types\FMIntType           # '' or non-numeric becomes null
+            fmfloat: MSDev\DoctrineFMDataAPIDriver\Types\FMFloatType       # '' or non-numeric becomes null
             fmhtml: MSDev\DoctrineFMDataAPIDriver\Types\FMHTMLType
             fmarray: MSDev\DoctrineFMDataAPIDriver\Types\FMArrayType
 ```
+
+FileMaker returns an empty string for an empty number, date or time field. The date, time, int and float types turn that (and any
+value they can't parse) into `null` rather than throwing, so map those properties as nullable. Zero is a value, not an empty field.
 
 ## Conventions ##
 
@@ -136,7 +143,8 @@ doctrine:
    ```
 
 6. If you need to know how many records matched the query which loaded a record, map the special rec_meta pseudo property.
-   It holds the JSON encoded `dataInfo` the Data API returned (`foundCount`, `returnedCount`, `totalRecordCount`, ...).
+   It holds JSON of the form `{"found": 12, "fetch": 5, "total": 340}`: the number of records the query matched, the number
+   returned (limited by the query's limit), and the total number of records in the table.
 
    ```php
    #[ORM\Column(name: 'rec_meta', type: 'string', nullable: true)]

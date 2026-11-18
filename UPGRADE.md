@@ -17,7 +17,7 @@ code lives on the `0.x` branch), but the mapping conventions and the helper clas
   the call stack for the entity manager, and left it out of the INSERT if it was empty. 1.0 has no way to know that, so Doctrine has to
   leave it out. If you forget, `FMIdentityGenerator` throws an exception explaining what to change. (The record created will have had its key blanked.)
   Identifiers which your application assigns itself need no change.
-* **Register the custom types you use** in the Doctrine configuration (`fmdatetime`, `fmdate`, `fmtime`, `fmhtml`, `fmarray`). Types no
+* **Register the custom types you use** in the Doctrine configuration (`fmdatetime`, `fmdate`, `fmtime`, `fmint`, `fmfloat`, `fmhtml`, `fmarray`). Types no
   longer report their own name, so the names are whatever you register them as. DBAL 4 no longer has an `array` type, so register
   `FMArrayType` under a name of your own.
 * **`FMTimeType`** now lives in `MSDev\DoctrineFMDataAPIDriver\Types` like the other types (it was declared in the namespace of the
@@ -33,8 +33,9 @@ code lives on the `0.x` branch), but the mapping conventions and the helper clas
   | `...\FMPlatform`, `FMKeywords` | `...\Platform\` |
   | `...\FMIdentityGenerator` | `...\Id\FMIdentityGenerator` |
 
-* **TLS handshake failures** (`tlsv1 alert decode error`) against servers which can't handle recent OpenSSL: set the new
-  `max_tls_version: '1.2'` driver option. See the README.
+* **TLS 1.2 is now the maximum by default** (when `ext-curl` is loaded), because some servers can't handle the handshake of recent
+  OpenSSL builds (`tlsv1 alert decode error`). Requests go through the driver's own curl-based client to do this. Set the
+  `max_tls_version` driver option to `null` or `'none'` to use the standard Symfony client instead. See the README.
 
 ## Behaviour changes ##
 
@@ -45,6 +46,15 @@ code lives on the `0.x` branch), but the mapping conventions and the helper clas
 * A mapped field which isn't present on the layout hydrates as `null`, rather than raising a PHP warning.
 * An expired token is refreshed once per request rather than once for the lifetime of the connection, and a retried script request
   still returns the script result.
+* **Logging in is lazy.** The driver no longer logs in when the connection is created, but on the first request, so a bad
+  username, password or host surfaces as an `AuthenticationException` (or `FMException`) then, not when you connect.
+* **`rec_meta` has a new shape**, `{"found": n, "fetch": n, "total": n}`, rather than the raw `dataInfo` from the Data API.
+* **The date, time and timestamp types return `null`** for an empty or unparseable value instead of throwing. The new `FMIntType`
+  and `FMFloatType` do the same for numbers, which FileMaker returns as `''` when empty.
+* **A record found by a single value is remembered** (up to 500 records per connection), so updating or deleting it afterwards
+  doesn't need another `_find` to get its FileMaker record id.
+* A transport failure, or a request URL the HTTP client rejects, is reported as an `FMException` (or `AuthenticationException` when
+  logging in) rather than escaping as a Symfony exception. A `101 Record is missing` response to a GET is an empty result.
 * `FMException` and the other driver exceptions are still thrown as they are. They deliberately aren't wrapped in a DBAL `DriverException`.
 
 ## Helper classes ##

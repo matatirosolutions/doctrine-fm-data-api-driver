@@ -25,6 +25,9 @@
     "symfony/http-client": "^7.4 || ^8.0",
     "symfony/mime": "^7.4 || ^8.0"
   },
+  "suggest": {
+    "ext-curl": "Needed for the max_tls_version cap (on by default) which works around servers that reject recent OpenSSL handshakes"
+  },
   "require-dev": {
     "phpunit/phpunit": "^10.5",
     "symfony/cache": "^7.4 || ^8.0",
