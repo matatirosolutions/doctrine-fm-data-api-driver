@@ -194,4 +194,61 @@ final class ReadTest extends OrmTestCase
 
         self::assertSame(['query' => [['weight' => '==0']]], $this->fm->lastRequest()['body']);
     }
+
+    public function testCountByCriteriaFiltersOnTheServerAndReturnsTheFoundCount(): void
+    {
+        $this->fm->queueRecords([self::record(1, ['__pk_KeywordID' => 'K1'])], ['foundCount' => 4, 'returnedCount' => 1, 'totalRecordCount' => 20]);
+
+        $count = $this->em->getRepository(Keyword::class)->count(['category' => 'x']);
+
+        // Only the count is wanted, so a single record is requested
+        self::assertSame(['query' => [['category' => '==x']], 'limit' => 1], $this->fm->lastRequest()['body']);
+        self::assertSame(4, $count);
+    }
+
+    public function testCountWithoutCriteriaUsesTheRecordsEndpoint(): void
+    {
+        $this->fm->queueRecords([], ['foundCount' => 20, 'returnedCount' => 1, 'totalRecordCount' => 20]);
+
+        $count = $this->em->getRepository(Keyword::class)->count([]);
+
+        $req = $this->fm->lastRequest();
+        self::assertSame('GET', $req['method']);
+        self::assertSame(['_offset' => '1', '_limit' => '1'], $req['query']);
+        self::assertSame(20, $count);
+    }
+
+    public function testCountIsZeroWhenNothingMatches(): void
+    {
+        $this->fm->queueError(401, 'No records match the request', 404);
+
+        self::assertSame(0, $this->em->getRepository(Keyword::class)->count(['category' => 'nope']));
+    }
+
+    public function testScalarDqlCount(): void
+    {
+        $this->fm->queueRecords([], ['foundCount' => 4]);
+
+        $count = $this->em
+            ->createQuery(sprintf('SELECT COUNT(k.uuid) FROM %s k WHERE k.category = :c', Keyword::class))
+            ->setParameter('c', 'x')
+            ->getSingleScalarResult();
+
+        self::assertSame(4, (int)$count);
+    }
+
+    public function testRecordMetadataIsAvailableThroughThePseudoField(): void
+    {
+        $this->fm->queueRecords(
+            [self::record(7, ['__pk_KeywordID' => 'K7', 'name' => 'a', 'category' => 'b', 'weight' => 1])],
+            ['foundCount' => 3, 'returnedCount' => 1, 'totalRecordCount' => 30]
+        );
+
+        [$keyword] = $this->em->getRepository(Keyword::class)->findBy(['name' => 'a']);
+
+        self::assertSame(
+            ['foundCount' => 3, 'returnedCount' => 1, 'totalRecordCount' => 30],
+            json_decode($keyword->getMeta(), true)
+        );
+    }
 }

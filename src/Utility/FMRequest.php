@@ -107,6 +107,8 @@ class FMRequest
     private function execute(string $method, string $uri, callable $options, bool $returnScriptResult): array
     {
         $refreshed = false;
+        // So that whatever was reported by an earlier response can't be mistaken for this one
+        $this->metadata = [];
 
         while (true) {
             [$response, $status, $body] = $this->send($method, $uri, $options());
@@ -222,7 +224,7 @@ class FMRequest
     private function setBaseURL(): void
     {
         $this->baseURI =
-            ('http' === substr($this->params['host'], 4) ? $this->params['host'] : 'https://' . $this->params['host']) .
+            (str_starts_with($this->params['host'], 'http') ? $this->params['host'] : 'https://' . $this->params['host']) .
             (in_array((int)$this->params['port'], [80, 443], true) ? '' : ':'.$this->params['port']) .
             ('/' === substr($this->params['host'], -1) ? '' : '/') .
             'fmi/data/v1/databases/' .

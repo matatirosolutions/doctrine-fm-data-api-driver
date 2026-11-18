@@ -3,3 +3,6 @@
 /vendor
 composer.lock
 .phpunit.cache/
+.env
+.env.local
+tests/Functional/Database/.admin-password

@@ -5,7 +5,7 @@ namespace MSDev\DoctrineFMDataAPIDriver\Utility;
 use Doctrine\DBAL\Connection;
 use Exception;
 use MSDev\DoctrineFMDataAPIDriver\Exception\FMException;
-use MSDev\DoctrineFMDataAPIDriver\FMConnection;
+use MSDev\DoctrineFMDataAPIDriver\Driver\FMConnection;
 use Throwable;
 
 

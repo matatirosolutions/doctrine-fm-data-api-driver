@@ -2,9 +2,8 @@
 
 namespace MSDev\DoctrineFMDataAPIDriver\Utility;
 
-use Doctrine\ORM\Mapping\ClassMetadata;
 use JsonException;
-use MSDev\DoctrineFMDataAPIDriver\FMConnection;
+use MSDev\DoctrineFMDataAPIDriver\Driver\FMConnection;
 use MSDev\DoctrineFMDataAPIDriver\Exception\FMException;
 use MSDev\DoctrineFMDataAPIDriver\Exception\NotImplementedException;
 use RuntimeException;
@@ -23,6 +22,8 @@ class QueryBuilder
     private string $uri;
 
     private array $options = [];
+
+    private bool $count = false;
 
 
     public function __construct(FMConnection $connection)
@@ -43,6 +44,15 @@ class QueryBuilder
     public function getOptions(): array
     {
         return $this->options;
+    }
+
+    /**
+     * Whether the query is a SELECT COUNT(...), which is answered from the `foundCount` the
+     * Data API reports, rather than from the records themselves.
+     */
+    public function isCount(): bool
+    {
+        return $this->count;
     }
 
     /**
@@ -77,6 +87,7 @@ class QueryBuilder
     private function generateFindCommand($tokens, $params): void
     {
         $layout = $this->getLayout($tokens);
+        $this->count = $this->isCountQuery($tokens);
         if (empty($this->query['WHERE'])) {
             $this->method = 'GET';
             $this->uri = sprintf('layouts/%s/records', $layout);
@@ -90,7 +101,7 @@ class QueryBuilder
             // If we don't set a (crazy) high default limit then findAll() doesn't really work
             // as the FM Data API only returns 100 records by default
             $offset = 1;
-            $limit = 10000;
+            $limit = $this->count ? 1 : 10000;
             if(isset($tokens['FROM'][0]['expr_type']) && 'subquery' === $tokens['FROM'][0]['expr_type']) {
                 $offset = $this->getSkip($tokens);
                 $limit = $this->getMax($tokens);
@@ -112,7 +123,10 @@ class QueryBuilder
         }
 
         // Limit
-        if('subquery' === $tokens['FROM'][0]['expr_type']) {
+        if($this->count) {
+            // Only the count is wanted, and that's reported whatever the limit is
+            $body['limit'] = 1;
+        } elseif('subquery' === $tokens['FROM'][0]['expr_type']) {
             $body['offset'] = $this->getSkip($tokens);
             $body['limit'] = $this->getMax($tokens);
         }
@@ -177,15 +191,13 @@ class QueryBuilder
         $list = substr($tokens['INSERT'][2]['base_expr'], 1, -1);
         $fields = explode(',', $list);
 
-        // need to know which is the ID column
-        $idColumn = $this->getIdColumn($tokens, new MetaData());
         $this->method = 'POST';
         $this->uri = sprintf('layouts/%s/records', $layout);
 
         $data = [];
         foreach($fields as $c => $f) {
             $field = trim($f);
-            if('rec_id' === $field || 'mod_id' === $field || 'rec_meta' === $field || ($idColumn === $field && empty($params[$c+1]))) {
+            if('rec_id' === $field || 'mod_id' === $field || 'rec_meta' === $field) {
                 continue;
             }
             $data[$field] = is_null($params[$c+1]) ? "" : $params[$c+1];
@@ -254,7 +266,7 @@ class QueryBuilder
     {
         $request = [];
         $requests = [];
-        $cols = $this->selectColumns($this->query);
+        $cols = $this->selectColumns($this->query) + $this->whereColumns($this->query['WHERE']);
         $pc = 1;
 
         foreach ($this->query['WHERE'] as $c => $cValue) {
@@ -316,6 +328,35 @@ class QueryBuilder
     }
 
 
+    private function isCountQuery(array $tokens): bool
+    {
+        return 1 === count($tokens['SELECT'] ?? [])
+            && 'aggregate_function' === ($tokens['SELECT'][0]['expr_type'] ?? null)
+            && 'COUNT' === strtoupper((string)($tokens['SELECT'][0]['base_expr'] ?? ''));
+    }
+
+    /**
+     * Columns referenced by the WHERE clause which aren't part of the SELECT (as is the case
+     * when counting), keyed in the same way as selectColumns()
+     */
+    private function whereColumns(array $expressions): array
+    {
+        $cols = [];
+        foreach ($expressions as $expression) {
+            if ('colref' === ($expression['expr_type'] ?? null)
+                && '?' !== $expression['base_expr']
+                && isset($expression['no_quotes']['parts'][1])
+            ) {
+                $cols[$expression['base_expr']] = $expression['no_quotes']['parts'][1];
+            }
+            if (!empty($expression['sub_tree']) && is_array($expression['sub_tree'])) {
+                $cols += $this->whereColumns($expression['sub_tree']);
+            }
+        }
+
+        return $cols;
+    }
+
     private function selectColumns($tokens): array
     {
         $cols = [];
@@ -325,7 +366,8 @@ class QueryBuilder
                 continue;
             }
 
-            if(isset($column['sub_tree'])) {
+            // Not a (possibly quoted) column, e.g. COUNT(*), which can't be a find criterion
+            if(isset($column['sub_tree']) && 'aggregate_function' !== ($column['expr_type'] ?? null)) {
                 $field = [];
                 foreach($column['sub_tree'] as $sub) {
                     $field[] = end($sub['no_quotes']['parts']);
@@ -335,28 +377,6 @@ class QueryBuilder
         }
 
         return $cols;
-    }
-
-    /**
-     * returns the column of the id
-     *
-     * @param array $tokens
-     * @param MetaData $metaData
-     * @return string
-     *
-     * @throws FMException
-     */
-    public function getIdColumn(array $tokens, MetaData $metaData): string
-    {
-        $table = $this->getLayout($tokens);
-        $meta = array_filter($metaData->get(), static function ($meta) use ($table) {
-            /** @var ClassMetadata $meta */
-            return $meta->getTableName() === $table;
-        });
-
-        $idColumns = !empty($meta) ? end($meta)->getIdentifierColumnNames() : [];
-
-        return !empty($idColumns) ? end($idColumns) : 'id';
     }
 
     /**

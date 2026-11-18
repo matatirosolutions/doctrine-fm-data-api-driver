@@ -46,6 +46,14 @@ final class FMRequestTest extends TestCase
         self::assertStringStartsWith('https://fm.example.test:8443/fmi/data/v1/databases/TestDB/', $this->fm->requests(true)[0]['url']);
     }
 
+    public function testAHostWhichIncludesASchemeIsUsedAsGiven(): void
+    {
+        $this->fm->queueLogin();
+        $this->fm->request(['host' => 'http://fm.example.test', 'port' => 80]);
+
+        self::assertStringStartsWith('http://fm.example.test/fmi/data/v1/databases/TestDB/', $this->fm->requests(true)[0]['url']);
+    }
+
     public function testSubsequentRequestsCarryTheBearerToken(): void
     {
         $this->fm->queueLogin('abc123')->queueRecords([['recordId' => '1', 'modId' => '0', 'fieldData' => []]]);

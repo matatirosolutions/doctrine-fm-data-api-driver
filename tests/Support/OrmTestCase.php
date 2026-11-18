@@ -26,6 +26,9 @@ abstract class OrmTestCase extends TestCase
         MockFileMakerDriver::$mock = $this->fm;
 
         $config = ORMSetup::createAttributeMetadataConfiguration([__DIR__ . '/../Fixtures'], true);
+        if (PHP_VERSION_ID >= 80400 && method_exists($config, 'enableNativeLazyObjects')) {
+            $config->enableNativeLazyObjects(true);
+        }
         $connection = DriverManager::getConnection(
             array_merge(MockFileMaker::PARAMS, ['driverClass' => MockFileMakerDriver::class]),
             $config

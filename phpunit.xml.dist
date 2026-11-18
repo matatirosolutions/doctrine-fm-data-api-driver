@@ -14,20 +14,9 @@
             <directory>tests/Integration</directory>
         </testsuite>
     </testsuites>
-    <groups>
-        <exclude>
-            <group>known-bug</group>
-        </exclude>
-    </groups>
     <source>
         <include>
-            <directory>Utility</directory>
-            <directory>Types</directory>
-            <directory>Exception</directory>
-            <file>FMConnection.php</file>
-            <file>FMDriver.php</file>
-            <file>FMResult.php</file>
-            <file>FMStatement.php</file>
+            <directory>src</directory>
         </include>
     </source>
 </phpunit>

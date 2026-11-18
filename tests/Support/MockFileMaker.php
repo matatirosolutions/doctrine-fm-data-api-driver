@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace MSDev\DoctrineFMDataAPIDriver\Tests\Support;
 
-use MSDev\DoctrineFMDataAPIDriver\FMConnection;
+use MSDev\DoctrineFMDataAPIDriver\Driver\FMConnection;
 use MSDev\DoctrineFMDataAPIDriver\Utility\FMRequest;
 use ReflectionClass;
 use Symfony\Component\HttpClient\MockHttpClient;
@@ -142,16 +142,7 @@ final class MockFileMaker
 
     public function connection(array $params = []): FMConnection
     {
-        $connection = (new ReflectionClass(FMConnection::class))->newInstanceWithoutConstructor();
-        $set = static function (string $prop, mixed $value) use ($connection): void {
-            $r = new \ReflectionProperty(FMConnection::class, $prop);
-            $r->setValue($connection, $value);
-        };
-        $set('params', array_merge(self::PARAMS, $params));
-        $set('connection', $this->request($params));
-        $set('metadata', null);
-
-        return $connection;
+        return new FMConnection(array_merge(self::PARAMS, $params), $this->client);
     }
 
     /**

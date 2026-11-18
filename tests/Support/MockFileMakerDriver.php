@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace MSDev\DoctrineFMDataAPIDriver\Tests\Support;
 
-use MSDev\DoctrineFMDataAPIDriver\FMConnection;
-use MSDev\DoctrineFMDataAPIDriver\FMDriver;
+use MSDev\DoctrineFMDataAPIDriver\Driver\FMConnection;
+use MSDev\DoctrineFMDataAPIDriver\Driver\FMDriver;
 
 /**
  * DBAL instantiates driver classes itself (via the `driverClass` param), so the
@@ -15,7 +15,7 @@ final class MockFileMakerDriver extends FMDriver
 {
     public static ?MockFileMaker $mock = null;
 
-    public function connect(array $params, $username = null, $password = null, array $driverOptions = []): FMConnection
+    public function connect(#[\SensitiveParameter] array $params): FMConnection
     {
         return (self::$mock ?? throw new \LogicException('No MockFileMaker registered'))->connection($params);
     }
