@@ -25,6 +25,9 @@ class Keyword
     #[ORM\Column(name: 'mod_id', type: 'integer')]
     private ?int $modId = null;
 
+    #[ORM\Column(name: 'rec_meta', type: 'string', nullable: true)]
+    private ?string $meta = null;
+
     #[ORM\Id]
     #[ORM\Column(name: 'ID', type: 'string', length: 255, insertable: false)]
     #[ORM\GeneratedValue(strategy: 'CUSTOM')]
@@ -60,6 +63,7 @@ class Keyword
 
     public function getRecordId(): ?int { return $this->recordId; }
     public function getModId(): ?int { return $this->modId; }
+    public function getMeta(): ?string { return $this->meta; }
     public function getId(): ?string { return $this->id; }
     public function getName(): ?string { return $this->name; }
     public function setName(?string $name): self { $this->name = $name; return $this; }

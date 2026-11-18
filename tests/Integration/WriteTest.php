@@ -6,6 +6,7 @@ namespace MSDev\DoctrineFMDataAPIDriver\Tests\Integration;
 
 use MSDev\DoctrineFMDataAPIDriver\Tests\Fixtures\Keyword;
 use MSDev\DoctrineFMDataAPIDriver\Tests\Support\OrmTestCase;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * persist / flush / remove through the real ORM.
@@ -84,6 +85,70 @@ final class WriteTest extends OrmTestCase
         self::assertSame('PATCH', $patch['method']);
         self::assertSame('layouts/Keyword/records/9', $patch['uri']);
         self::assertSame(['fieldData' => ['name' => "Somewhere (here) -- ? #x, it's", 'weight' => 2]], $patch['body']);
+    }
+
+    public function testUpdatingAnEntityLoadedByItsKeyNeedsNoSecondLookup(): void
+    {
+        $this->fm->queueRecords([self::record(9, ['__pk_KeywordID' => 'K9', 'name' => 'old', 'category' => 'x', 'weight' => 1])]);
+        $keyword = $this->em->find(Keyword::class, 'K9');
+        $this->fm->queueResponse(['modId' => '5']);
+
+        $keyword->setName('new');
+        $this->em->flush();
+
+        $requests = $this->fm->requests();
+        self::assertSame(['POST', 'PATCH'], array_column($requests, 'method'), 'the load, then the update: no _find in between');
+        self::assertSame('layouts/Keyword/records/9', $requests[1]['uri']);
+    }
+
+    public function testRemovingAnEntityLoadedByItsKeyNeedsNoLookup(): void
+    {
+        $this->fm->queueRecords([self::record(9, ['__pk_KeywordID' => 'K9', 'name' => 'old', 'category' => 'x', 'weight' => 1])]);
+        $keyword = $this->em->find(Keyword::class, 'K9');
+        $this->fm->queueResponse([]);
+
+        $this->em->remove($keyword);
+        $this->em->flush();
+
+        self::assertSame(['POST', 'DELETE'], array_column($this->fm->requests(), 'method'));
+    }
+
+    public function testADeletedRecordsIdIsNotUsedAgain(): void
+    {
+        $this->fm->queueRecords([self::record(9, ['__pk_KeywordID' => 'K9', 'name' => 'old', 'category' => 'x', 'weight' => 1])]);
+        $keyword = $this->em->find(Keyword::class, 'K9');
+        $this->fm->queueResponse([]);
+        $this->em->remove($keyword);
+        $this->em->flush();
+
+        // The key could be used by a new record, so a later write has to look the record up afresh
+        $this->fm->queueRecords([self::record(12, ['__pk_KeywordID' => 'K9'])])->queueResponse(['modId' => '1']);
+        $this->em->getConnection()->executeStatement('UPDATE Keyword SET name = ? WHERE __pk_KeywordID = ?', ['again', 'K9']);
+
+        $requests = array_slice($this->fm->requests(), 2);
+        self::assertSame('layouts/Keyword/_find', $requests[0]['uri']);
+        self::assertSame('layouts/Keyword/records/12', $requests[1]['uri']);
+    }
+
+    /** @return iterable<string, array{0: list<array>, 1: array}> */
+    public static function loadsWhichAreNotRemembered(): iterable
+    {
+        $record = self::record(9, ['__pk_KeywordID' => 'K9', 'name' => 'old', 'category' => 'x', 'weight' => 1]);
+
+        yield 'several records found' => [[$record, self::record(10, ['__pk_KeywordID' => 'K9'])], ['uuid' => 'K9']];
+        yield 'more than one criterion' => [[$record], ['uuid' => 'K9', 'name' => 'old']];
+    }
+
+    #[DataProvider('loadsWhichAreNotRemembered')]
+    public function testOnlyASingleRecordFoundByASingleFieldIsRemembered(array $records, array $criteria): void
+    {
+        $this->fm->queueRecords($records);
+        $this->em->getRepository(Keyword::class)->findBy($criteria);
+
+        $this->fm->queueRecords([self::record(9, ['__pk_KeywordID' => 'K9'])])->queueResponse(['modId' => '1']);
+        $this->em->getConnection()->executeStatement('UPDATE Keyword SET name = ? WHERE __pk_KeywordID = ?', ['x', 'K9']);
+
+        self::assertSame('layouts/Keyword/_find', $this->fm->requests()[1]['uri'], 'the id had to be looked up');
     }
 
     public function testClearingAFieldPatchesItToAnEmptyString(): void

@@ -34,12 +34,49 @@ class FMConnection implements Connection
 
     private ?string $lastInsertedRecordId = null;
 
+    /** Upper limit on the record ids held, as a long running worker could otherwise accumulate them forever */
+    private const RECORD_ID_LIMIT = 500;
+
+    /** @var array<string, int> Ids of records recently loaded by a single field, keyed by layout, field and value */
+    private array $recordIds = [];
+
     /**
      * @throws AuthenticationException
      */
     public function __construct(protected array $params, ?HttpClientInterface $client = null)
     {
         $this->connection = new FMRequest($params, $client);
+    }
+
+    /**
+     * Remember the record id of a record which has just been loaded by a single field (typically its key), so that
+     * updating or deleting it doesn't need another _find just to get the id back.
+     */
+    public function rememberRecordId(string $layout, string $field, string $value, int $recordId): void
+    {
+        $this->recordIds[$this->recordIdKey($layout, $field, $value)] = $recordId;
+        if (count($this->recordIds) > self::RECORD_ID_LIMIT) {
+            array_shift($this->recordIds);
+        }
+    }
+
+    /**
+     * The record id previously seen for the layout/field/value, if any. A record's id doesn't change for its
+     * lifetime, and loading the record again refreshes the entry.
+     */
+    public function getRecordId(string $layout, string $field, string $value): ?int
+    {
+        return $this->recordIds[$this->recordIdKey($layout, $field, $value)] ?? null;
+    }
+
+    public function forgetRecordId(string $layout, string $field, string $value): void
+    {
+        unset($this->recordIds[$this->recordIdKey($layout, $field, $value)]);
+    }
+
+    private function recordIdKey(string $layout, string $field, string $value): string
+    {
+        return $layout . '|' . $field . '|' . $value;
     }
 
     public function prepare(string $sql): Statement

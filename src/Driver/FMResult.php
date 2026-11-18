@@ -41,7 +41,11 @@ class FMResult implements Result
                 $row[$alias] = match ($source) {
                     'rec_id' => $record['recordId'] ?? null,
                     'mod_id' => $record['modId'] ?? null,
-                    'rec_meta' => json_encode($metadata),
+                    'rec_meta' => json_encode([
+                        'found' => $metadata['foundCount'] ?? 0,
+                        'fetch' => $metadata['returnedCount'] ?? 0,
+                        'total' => $metadata['totalRecordCount'] ?? 0,
+                    ]),
                     default => self::emptyToNull($record['fieldData'][$source] ?? null),
                 };
             }

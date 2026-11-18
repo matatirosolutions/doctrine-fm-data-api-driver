@@ -247,7 +247,7 @@ final class ReadTest extends OrmTestCase
         [$keyword] = $this->em->getRepository(Keyword::class)->findBy(['name' => 'a']);
 
         self::assertSame(
-            ['foundCount' => 3, 'returnedCount' => 1, 'totalRecordCount' => 30],
+            ['found' => 3, 'fetch' => 1, 'total' => 30],
             json_decode($keyword->getMeta(), true)
         );
     }

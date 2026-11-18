@@ -82,6 +82,16 @@ class QueryTest extends FunctionalTestCase
         self::assertSame(['Date', 'Elderberry'], $this->names($qb->getQuery()->getResult()));
     }
 
+    public function testRecordMetadataReportsWhatWasFoundFetchedAndHeld(): void
+    {
+        $found = $this->em->getRepository(Keyword::class)->findBy(['category' => $this->marker], ['weight' => 'ASC'], 2);
+
+        $meta = json_decode($found[0]->getMeta(), true);
+        self::assertSame(5, $meta['found']);
+        self::assertSame(2, $meta['fetch']);
+        self::assertGreaterThanOrEqual(5, $meta['total'], 'every record in the table');
+    }
+
     public function testCount(): void
     {
         $repo = $this->em->getRepository(Keyword::class);

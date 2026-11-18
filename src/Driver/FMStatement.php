@@ -48,6 +48,7 @@ class FMStatement implements Statement
         switch (strtolower((string)array_key_first($tokens))) {
             case 'select':
                 [$builder, $records, $metadata] = $this->perform($tokens, $params);
+                $this->rememberRecordId($builder, $records);
                 if ($builder->isCount()) {
                     $alias = $tokens['SELECT'][0]['alias']['no_quotes']['parts'][0] ?? 'count';
 
@@ -90,6 +91,30 @@ class FMStatement implements Statement
         $records = $request->performFMRequest($builder->getMethod(), $builder->getUri(), $builder->getOptions());
 
         return [$builder, $records, $request->getMetadata()];
+    }
+
+    /**
+     * When a single record has been found by a single field (i.e. loading an entity by its key) hold on to its
+     * record id, so that a following UPDATE or DELETE of that entity doesn't have to run a second _find to get it.
+     */
+    private function rememberRecordId(QueryBuilder $builder, array $records): void
+    {
+        $uri = $builder->getUri();
+        if ('POST' !== $builder->getMethod() || !str_ends_with($uri, '/_find') || 1 !== count($records) || !isset($records[0]['recordId'])) {
+            return;
+        }
+
+        $query = json_decode($builder->getOptions()['body'] ?? '', true)['query'] ?? [];
+        if (1 !== count($query) || 1 !== count($query[0]) || !is_scalar(current($query[0]))) {
+            return;
+        }
+
+        $this->conn->rememberRecordId(
+            explode('/', $uri)[1],
+            (string)key($query[0]),
+            (string)preg_replace('/^==/', '', (string)current($query[0])),
+            (int)$records[0]['recordId']
+        );
     }
 
     /**

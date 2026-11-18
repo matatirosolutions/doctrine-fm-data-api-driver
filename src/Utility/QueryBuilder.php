@@ -179,6 +179,9 @@ class QueryBuilder
         $recID = $this->getRecordID($tokens, $layout, $params);
 
         $this->uri = sprintf('layouts/%s/records/%s', $layout, $recID);
+
+        // The record is going, so its id must not be used again
+        $this->connection->forgetRecordId($layout, $this->whereField($tokens), (string)$params[count($params)]);
     }
 
 
@@ -213,14 +216,28 @@ class QueryBuilder
     /**
      * @throws FMException  | JsonException
      */
+    /** The field an UPDATE or DELETE finds its record by */
+    private function whereField(array $tokens): string
+    {
+        return str_replace("'", '', $tokens['WHERE'][0]['base_expr']);
+    }
+
     private function getRecordID(array $tokens, string $layout, array $params): int
     {
         $uri = sprintf('layouts/%s/_find', $layout);
         $uuid = $params[count($params)];
+        $field = $this->whereField($tokens);
+
+        // The record may have just been loaded by this field, in which case its id is already known
+        $known = $this->connection->getRecordId($layout, $field, (string)$uuid);
+        if (null !== $known) {
+            return $known;
+        }
+
         $options = [
             'body' => json_encode([
                 'query' => [
-                    [str_replace("'", '', $tokens['WHERE'][0]['base_expr']) => $uuid]
+                    [$field => $uuid]
                 ]
             ], JSON_THROW_ON_ERROR)
         ];
@@ -430,7 +447,7 @@ class QueryBuilder
         return $sort;
     }
 
-    private function getOperator(string $request, string $parameter): string
+    private function getOperator(string $request, ?string $parameter): string
     {
         switch($request) {
             case '=':
