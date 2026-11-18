@@ -33,9 +33,8 @@ code lives on the `0.x` branch), but the mapping conventions and the helper clas
   | `...\FMPlatform`, `FMKeywords` | `...\Platform\` |
   | `...\FMIdentityGenerator` | `...\Id\FMIdentityGenerator` |
 
-* **TLS 1.2 is now the maximum by default** (when `ext-curl` is loaded), because some servers can't handle the handshake of recent
-  OpenSSL builds (`tlsv1 alert decode error`). Requests go through the driver's own curl-based client to do this. Set the
-  `max_tls_version` driver option to `null` or `'none'` to use the standard Symfony client instead. See the README.
+* **TLS handshake failures** (`tlsv1 alert decode error`) against servers which can't handle recent OpenSSL: set the new
+  `max_tls_version: '1.2'` driver option. See the README.
 
 ## Behaviour changes ##
 

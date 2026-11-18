@@ -37,7 +37,7 @@ These go in the connection's `driverOptions` (`options:` in DoctrineBundle's con
 doctrine:
     dbal:
         options:
-            max_tls_version: '1.2'          # see below
+            max_tls_version: '1.2'          # optional, see below
             http_client_options:            # any Symfony HttpClient option, e.g. for a self-signed certificate
                 verify_peer: false
                 verify_host: false
@@ -46,14 +46,13 @@ doctrine:
 * `http_client` - your own `Symfony\Contracts\HttpClient\HttpClientInterface`, if you need full control (a PHP object, so only
   possible when you build the connection in code). Otherwise the driver creates a client with `HttpClient::create()`.
 * `http_client_options` - default request options for the client the driver creates.
-* `max_tls_version` - never negotiate a TLS version above this one. Defaults to `'1.2'` when `ext-curl` is loaded. Set it to `null`
-  or `'none'` to turn the cap off and use the standard Symfony client.
+* `max_tls_version` - never negotiate a TLS version above this one (`1.2`, say). Off by default, so connections use TLS 1.3
+  where the server offers it.
 
-**About `max_tls_version`.** Some servers can't cope with the TLS handshake of recent OpenSSL builds (OpenSSL 4, which
+**When to use `max_tls_version`.** Some servers can't cope with the TLS handshake of recent OpenSSL builds (OpenSSL 4, which
 current PHP builds can link against) and drop the connection with `tlsv1 alert decode error`, on every request, while older clients
-work. Symfony's HTTP clients can only set a *minimum* TLS version, so unless you turn it off the driver makes its requests through its
-own small curl-based client (`MaxTlsHttpClient`, needs `ext-curl`) which can cap it. The helper classes use the same client. A server
-which handles TLS 1.3 fine loses nothing by the cap; set `max_tls_version: null` if you'd rather have it.
+work. Symfony's HTTP clients can only set a *minimum* TLS version, so with this option the driver makes its requests through its own
+small curl-based client (`MaxTlsHttpClient`, needs `ext-curl`) which can cap it. The helper classes use the same client.
 
 ### Types ###
 

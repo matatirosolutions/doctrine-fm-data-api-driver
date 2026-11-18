@@ -7,8 +7,9 @@ namespace MSDev\DoctrineFMDataAPIDriver\Tests\Unit;
 use InvalidArgumentException;
 use MSDev\DoctrineFMDataAPIDriver\Utility\HttpClientFactory;
 use MSDev\DoctrineFMDataAPIDriver\Utility\MaxTlsHttpClient;
-use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\HttpClient\CurlHttpClient;
+use Symfony\Component\HttpClient\HttpClient;
 use Symfony\Component\Mime\Part\DataPart;
 use Symfony\Component\Mime\Part\Multipart\FormDataPart;
 use Symfony\Contracts\HttpClient\Exception\TransportExceptionInterface;
@@ -151,24 +152,10 @@ class MaxTlsHttpClientTest extends TestCase
         new MaxTlsHttpClient('1.4');
     }
 
-    public function testFactoryCapsTheTlsVersionAt12ByDefault(): void
+    public function testFactoryChoosesTheClientFromDriverOptions(): void
     {
-        self::assertInstanceOf(MaxTlsHttpClient::class, HttpClientFactory::create([]));
-        self::assertInstanceOf(MaxTlsHttpClient::class, HttpClientFactory::create(['driverOptions' => ['http_client_options' => ['verify_peer' => false]]]));
-        self::assertInstanceOf(MaxTlsHttpClient::class, HttpClientFactory::create(['driverOptions' => ['max_tls_version' => '1.3']]));
-    }
-
-    #[DataProvider('capDisabled')]
-    public function testFactoryUsesSymfonysClientWhenTheCapIsDisabled(mixed $value): void
-    {
-        self::assertNotInstanceOf(MaxTlsHttpClient::class, HttpClientFactory::create(['driverOptions' => ['max_tls_version' => $value]]));
-    }
-
-    public static function capDisabled(): iterable
-    {
-        yield 'null' => [null];
-        yield 'false' => [false];
-        yield 'none' => ['none'];
-        yield 'NONE' => ['NONE'];
+        self::assertInstanceOf(MaxTlsHttpClient::class, HttpClientFactory::create(['driverOptions' => ['max_tls_version' => '1.2']]));
+        self::assertNotInstanceOf(MaxTlsHttpClient::class, HttpClientFactory::create([]));
+        self::assertNotInstanceOf(MaxTlsHttpClient::class, HttpClientFactory::create(['driverOptions' => ['http_client_options' => ['verify_peer' => false]]]));
     }
 }
