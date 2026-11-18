@@ -21,7 +21,7 @@
     "ext-json": "*",
     "doctrine/dbal": "^4.2",
     "doctrine/orm": "^3.3",
-    "greenlion/php-sql-parser": "^4.0",
+    "greenlion/php-sql-parser": "^4.5",
     "symfony/http-client": "^7.4 || ^8.0",
     "symfony/mime": "^7.4 || ^8.0"
   },
