@@ -10,7 +10,6 @@ namespace MSDev\DoctrineFMDataAPIDriver\Utility;
 
 use Doctrine\DBAL\Connection;
 use MSDev\DoctrineFMDataAPIDriver\Exception\FMException;
-use Symfony\Component\HttpClient\HttpClient;
 use Symfony\Contracts\HttpClient\Exception\ExceptionInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
@@ -34,7 +33,7 @@ class ContainerAccess
     {
         $this->con = $conn->getNativeConnection();
         $this->script = $script;
-        $this->client = $client ?? HttpClient::create();
+        $this->client = $client ?? HttpClientFactory::create($this->con instanceof FMRequest ? $this->con->getParameters() : []);
     }
 
     /**

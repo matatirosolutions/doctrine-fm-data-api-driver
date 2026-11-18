@@ -5,7 +5,6 @@ namespace MSDev\DoctrineFMDataAPIDriver\Utility;
 use JsonException;
 use MSDev\DoctrineFMDataAPIDriver\Exception\AuthenticationException;
 use MSDev\DoctrineFMDataAPIDriver\Exception\FMException;
-use Symfony\Component\HttpClient\HttpClient;
 use Symfony\Component\Mime\Part\DataPart;
 use Symfony\Component\Mime\Part\Multipart\FormDataPart;
 use Symfony\Contracts\HttpClient\Exception\TransportExceptionInterface;
@@ -49,7 +48,7 @@ class FMRequest
         private readonly array $params,
         ?HttpClientInterface $client = null,
     ) {
-        $this->client = $client ?? HttpClient::create();
+        $this->client = $client ?? HttpClientFactory::create($params);
         $this->setBaseURL();
         $this->fetchToken();
     }
