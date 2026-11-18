@@ -109,7 +109,7 @@ abstract class FunctionalTestCase extends TestCase
                 'driverOptions' => array_filter([
                     // FM_VERIFY_TLS=0 for a local server with a self-signed certificate
                     'http_client_options' => '0' === getenv('FM_VERIFY_TLS') ? ['verify_peer' => false, 'verify_host' => false] : null,
-                    // FM_MAX_TLS_VERSION=1.2 for a server which can't handle the TLS 1.3 handshake of recent OpenSSL
+                    // FM_MAX_TLS_VERSION=none to switch off the driver's default cap of TLS 1.2
                     'max_tls_version' => getenv('FM_MAX_TLS_VERSION') ?: null,
                 ]),
             ];
