@@ -1,0 +1,33 @@
+{"op": "update:table", "name": "DoctrineFMTest", "newName": "Keyword"}
+{"op": "create:table", "name": "Note"}
+{"op": "create:field", "table": "Keyword", "name": "ID", "type": "text", "options": {"primaryKey": true, "indexing": "all", "autoEnter": {"type": "calc", "calculation": {"text": "Get ( UUID )", "context": "Keyword"}, "prohibitModification": true}}}
+{"op": "create:field", "table": "Keyword", "name": "Name", "type": "text"}
+{"op": "create:field", "table": "Keyword", "name": "Category", "type": "text"}
+{"op": "create:field", "table": "Keyword", "name": "Weight", "type": "number"}
+{"op": "create:field", "table": "Keyword", "name": "DateValue", "type": "date"}
+{"op": "create:field", "table": "Keyword", "name": "TimeValue", "type": "time"}
+{"op": "create:field", "table": "Keyword", "name": "Stamp", "type": "timestamp"}
+{"op": "create:field", "table": "Keyword", "name": "Body", "type": "text"}
+{"op": "create:field", "table": "Keyword", "name": "Photo", "type": "container"}
+{"op": "create:field", "table": "Keyword", "name": "Name_calc", "type": "text", "fieldType": "calculated", "calculation": {"text": "Upper ( Keyword::Name )", "context": "Keyword"}}
+{"op": "create:field", "table": "Keyword", "name": "recCreateAccountName", "type": "text", "options": {"autoEnter": {"type": "variable", "variable": "creatorAccount", "prohibitModification": true}}}
+{"op": "create:field", "table": "Keyword", "name": "recCreateTimestamp", "type": "timestamp", "options": {"autoEnter": {"type": "variable", "variable": "creationTimestamp", "prohibitModification": true}}}
+{"op": "create:field", "table": "Keyword", "name": "recModifyAccountName", "type": "text", "options": {"autoEnter": {"type": "variable", "variable": "modifierAccount", "prohibitModification": true}}}
+{"op": "create:field", "table": "Keyword", "name": "recModifyTimestamp", "type": "timestamp", "options": {"autoEnter": {"type": "variable", "variable": "modificationTimestamp", "prohibitModification": true}}}
+{"op": "create:field", "table": "Note", "name": "ID", "type": "text", "options": {"primaryKey": true, "indexing": "all", "autoEnter": {"type": "calc", "calculation": {"text": "Get ( UUID )", "context": "Note"}, "prohibitModification": true}}}
+{"op": "create:field", "table": "Note", "name": "ID_Keyword", "type": "text", "options": {"indexing": "all"}}
+{"op": "create:field", "table": "Note", "name": "Text", "type": "text"}
+{"op": "create:field", "table": "Note", "name": "recCreateAccountName", "type": "text", "options": {"autoEnter": {"type": "variable", "variable": "creatorAccount", "prohibitModification": true}}}
+{"op": "create:field", "table": "Note", "name": "recCreateTimestamp", "type": "timestamp", "options": {"autoEnter": {"type": "variable", "variable": "creationTimestamp", "prohibitModification": true}}}
+{"op": "create:field", "table": "Note", "name": "recModifyAccountName", "type": "text", "options": {"autoEnter": {"type": "variable", "variable": "modifierAccount", "prohibitModification": true}}}
+{"op": "create:field", "table": "Note", "name": "recModifyTimestamp", "type": "timestamp", "options": {"autoEnter": {"type": "variable", "variable": "modificationTimestamp", "prohibitModification": true}}}
+{"op": "create:relation", "left": "Keyword", "right": "Note", "predicates": [{"leftField": "ID", "op": "=", "rightField": "ID_Keyword"}]}
+{"op": "create:layout", "name": "API_Keyword", "tableOccurrence": "Keyword", "hidden": true, "objects": [{"type": "field", "field": "Keyword::ID", "label": ""}, {"type": "field", "field": "Keyword::Name", "label": ""}, {"type": "field", "field": "Keyword::Category", "label": ""}, {"type": "field", "field": "Keyword::Weight", "label": ""}, {"type": "field", "field": "Keyword::DateValue", "label": ""}, {"type": "field", "field": "Keyword::TimeValue", "label": ""}, {"type": "field", "field": "Keyword::Stamp", "label": ""}, {"type": "field", "field": "Keyword::Body", "label": ""}, {"type": "field", "field": "Keyword::Photo", "label": ""}, {"type": "field", "field": "Keyword::Name_calc", "label": ""}, {"type": "field", "field": "Keyword::recCreateAccountName", "label": ""}, {"type": "field", "field": "Keyword::recCreateTimestamp", "label": ""}, {"type": "field", "field": "Keyword::recModifyAccountName", "label": ""}, {"type": "field", "field": "Keyword::recModifyTimestamp", "label": ""}]}
+{"op": "create:layout", "name": "API_Note", "tableOccurrence": "Note", "hidden": true, "objects": [{"type": "field", "field": "Note::ID", "label": ""}, {"type": "field", "field": "Note::ID_Keyword", "label": ""}, {"type": "field", "field": "Note::Text", "label": ""}, {"type": "field", "field": "Note::recCreateAccountName", "label": ""}, {"type": "field", "field": "Note::recCreateTimestamp", "label": ""}, {"type": "field", "field": "Note::recModifyAccountName", "label": ""}, {"type": "field", "field": "Note::recModifyTimestamp", "label": ""}]}
+{"op": "create:layout", "name": "Blank_Keyword", "tableOccurrence": "Keyword", "hidden": true}
+{"op": "create:layout", "name": "Blank_Note", "tableOccurrence": "Note", "hidden": true}
+{"op": "delete:layout", "name": "DoctrineFMTest"}
+{"op": "create:script", "name": "Echo Parameter ( json )", "body": [{"stepID": 89, "step": "#", "text": "Purpose: Return the script parameter inside a standard result object, so tests can prove parameters reach FileMaker."}, {"stepID": 89, "step": "#", "text": "Context: any layout"}, {"stepID": 89, "step": "#", "text": "Parameters: any text, passed through as a JSON string value"}, {"stepID": 89, "step": "#", "text": "Returns: JSON { errorCode, message, data } where data is the parameter"}, {"stepID": 89, "step": "#", "text": ""}, {"stepID": 85, "step": "Allow User Abort", "on": false}, {"stepID": 86, "step": "Set Error Capture", "on": true}, {"stepID": 141, "step": "Set Variable", "name": "$result", "value": "JSONSetElement ( \"{}\" ; [ \"errorCode\" ; 0 ; JSONNumber ] ; [ \"message\" ; \"\" ; JSONString ] ; [ \"data\" ; Get ( ScriptParameter ) ; JSONString ] )"}, {"stepID": 103, "step": "Exit Script", "result": "$result"}]}
+{"op": "create:privilegeSet", "name": "API Test", "description": "Test-suite access over the Data API only", "fileOptions": {}, "records": {"access": "createEditDelete"}, "layouts": {"access": "allModifiable"}, "scripts": {"access": "allExecutableOnly"}, "valueLists": {"access": "allNoAccess"}}
+{"op": "update:extendedPrivilege", "keyword": "fmrest", "privilegeSets": ["[Full Access]", "API Test"]}
+{"op": "create:account", "name": "api_test", "privilegeSet": "API Test", "password": "__API_PASSWORD__", "description": "Used by the Doctrine driver functional tests"}
