@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
+         bootstrap="vendor/autoload.php"
+         colors="true"
+         cacheDirectory=".phpunit.cache"
+         failOnWarning="true"
+         failOnRisky="true">
+    <testsuites>
+        <testsuite name="unit">
+            <directory>tests/Unit</directory>
+        </testsuite>
+        <testsuite name="integration">
+            <directory>tests/Integration</directory>
+        </testsuite>
+    </testsuites>
+    <groups>
+        <exclude>
+            <group>known-bug</group>
+        </exclude>
+    </groups>
+    <source>
+        <include>
+            <directory>Utility</directory>
+            <directory>Types</directory>
+            <directory>Exception</directory>
+            <file>FMConnection.php</file>
+            <file>FMDriver.php</file>
+            <file>FMResult.php</file>
+            <file>FMStatement.php</file>
+        </include>
+    </source>
+</phpunit>

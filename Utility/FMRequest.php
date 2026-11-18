@@ -4,6 +4,7 @@ namespace MSDev\DoctrineFMDataAPIDriver\Utility;
 
 use Exception;
 use GuzzleHttp\Client;
+use GuzzleHttp\ClientInterface;
 use GuzzleHttp\Exception\ClientException;
 use GuzzleHttp\Exception\ConnectException;
 use GuzzleHttp\Exception\GuzzleException;
@@ -26,7 +27,8 @@ class FMRequest
      * @throws AuthenticationException
      */
     public function __construct(
-        private readonly array $params
+        private readonly array $params,
+        private readonly ?ClientInterface $client = null,
     ) {
         $this->setBaseURL();
         $this->fetchToken();
@@ -34,7 +36,7 @@ class FMRequest
 
     public function performFMRequest(string $method, string $uri, array $options, bool $returnScriptResult = false): array
     {
-        $client = new Client();
+        $client = $this->client ?? new Client();
         $headers = [
             'headers' => [
                 'Content-Type' => 'application/json',
@@ -131,7 +133,7 @@ class FMRequest
             return;
         }
 
-        $client = new Client();
+        $client = $this->client ?? new Client();
         try {
             $response = $client->request('POST', $this->baseURI . 'sessions', [
                 'headers' => [

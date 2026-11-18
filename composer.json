@@ -26,16 +26,20 @@
     "guzzlehttp/guzzle": "^7.3"
   },
   "require-dev": {
-    "phpunit/phpunit": "@stable",
-    "symfony/yaml": "3.*",
-    "sensio/framework-extra-bundle": "3.*",
-    "symfony/framework-bundle": "3.*",
-    "doctrine/doctrine-bundle": "^1.6",
-    "symfony/validator": "3.*"
+    "phpunit/phpunit": "^10.5",
+    "symfony/cache": "^7.4"
   },
   "autoload": {
     "psr-4": {
       "MSDev\\DoctrineFMDataAPIDriver\\": ""
     }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "MSDev\\DoctrineFMDataAPIDriver\\Tests\\": "tests/"
+    }
+  },
+  "config": {
+    "sort-packages": true
   }
 }
