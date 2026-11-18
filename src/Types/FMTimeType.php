@@ -6,7 +6,6 @@ namespace MSDev\DoctrineFMDataAPIDriver\Types;
 
 use DateTimeInterface;
 use Doctrine\DBAL\Platforms\AbstractPlatform;
-use Doctrine\DBAL\Types\Exception\InvalidFormat;
 use Doctrine\DBAL\Types\Exception\InvalidType;
 use Doctrine\DBAL\Types\Type;
 
@@ -53,6 +52,8 @@ class FMTimeType extends Type
             }
         }
 
-        throw InvalidFormat::new((string)$value, static::class, self::FORMAT);
+        // FileMaker will hold anything in a date field if it is set to allow it, and a dud value shouldn't break the
+        // whole query: read it as no value
+        return null;
     }
 }
