@@ -57,6 +57,8 @@ code lives on the `0.x` branch), but the mapping conventions and the helper clas
   doesn't need another `_find` to get its FileMaker record id.
 * A transport failure, or a request URL the HTTP client rejects, is reported as an `FMException` (or `AuthenticationException` when
   logging in) rather than escaping as a Symfony exception. A `101 Record is missing` response to a GET is an empty result.
+* Requests time out after 300 seconds without data, where Guzzle (0.x) never did and Symfony's default would be 60. Set `timeout` in
+  `http_client_options` to change it.
 * `FMException` and the other driver exceptions are still thrown as they are. They deliberately aren't wrapped in a DBAL `DriverException`.
 
 ## Helper classes ##

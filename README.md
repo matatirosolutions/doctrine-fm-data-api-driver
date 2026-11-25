@@ -45,7 +45,8 @@ doctrine:
 
 * `http_client` - your own `Symfony\Contracts\HttpClient\HttpClientInterface`, if you need full control (a PHP object, so only
   possible when you build the connection in code). Otherwise the driver creates a client with `HttpClient::create()`.
-* `http_client_options` - default request options for the client the driver creates.
+* `http_client_options` - default request options for the client the driver creates. Requests are abandoned after 300 seconds
+  without any data arriving unless you set `timeout` (Symfony's own default, 60 seconds, is too short for the slowest finds).
 * `max_tls_version` - never negotiate a TLS version above this one (`1.2`, say). Off by default, so connections use TLS 1.3
   where the server offers it.
 

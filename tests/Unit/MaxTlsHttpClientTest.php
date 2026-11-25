@@ -158,4 +158,31 @@ class MaxTlsHttpClientTest extends TestCase
         self::assertNotInstanceOf(MaxTlsHttpClient::class, HttpClientFactory::create([]));
         self::assertNotInstanceOf(MaxTlsHttpClient::class, HttpClientFactory::create(['driverOptions' => ['http_client_options' => ['verify_peer' => false]]]));
     }
+
+    public function testTheIdleTimeoutIsLongerThanSymfonysDefaultUnlessSet(): void
+    {
+        // Slow FileMaker finds can take over a minute; the 0.x line (Guzzle) never timed out
+        self::assertSame(300.0, $this->timeoutOf(HttpClientFactory::create([])));
+        self::assertSame(300.0, $this->timeoutOf(HttpClientFactory::create(['driverOptions' => ['max_tls_version' => '1.2']])));
+        self::assertSame(
+            45.0,
+            $this->timeoutOf(HttpClientFactory::create(['driverOptions' => ['http_client_options' => ['timeout' => 45]]]))
+        );
+    }
+
+    private function timeoutOf(object $client): float
+    {
+        // MaxTlsHttpClient keeps its defaults on the mock client it wraps
+        if ($client instanceof MaxTlsHttpClient) {
+            $client = (new \ReflectionProperty($client, 'inner'))->getValue($client);
+        }
+
+        for ($class = new \ReflectionClass($client); $class; $class = $class->getParentClass()) {
+            if ($class->hasProperty('defaultOptions')) {
+                return (float) $class->getProperty('defaultOptions')->getValue($client)['timeout'];
+            }
+        }
+
+        self::fail('Unable to find the default options of ' . $client::class);
+    }
 }
