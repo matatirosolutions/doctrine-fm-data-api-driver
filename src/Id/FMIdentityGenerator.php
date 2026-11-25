@@ -2,15 +2,12 @@
 
 declare(strict_types=1);
 
-/*
- * This Generator is identical to the Doctrine equivalent except
- * that it's not converting all IDs to integers, since the most common
- * usecase for this in FM is to use Get(UUID) to generate the ID field
- */
-
 namespace MSDev\DoctrineFMDataAPIDriver\Id;
 
+use Doctrine\DBAL\Connection;
+use Doctrine\DBAL\Types\Type;
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\ORM\Mapping\ClassMetadata;
 use Doctrine\ORM\Id\AbstractIdGenerator;
 use MSDev\DoctrineFMDataAPIDriver\Exception\FMException;
 use Throwable;
@@ -24,6 +21,11 @@ use Throwable;
  * which would replace the one FileMaker generated.
  *
  * If the identifier is the rec_id pseudo field then FileMaker's record id is used and nothing needs to be fetched.
+ *
+ * Unlike Doctrine's IDENTITY generator, which casts every identifier to an integer, the value is converted by the
+ * identifier field's own type, so a Get(UUID) key stays a string and a serial number becomes an int.
+ *
+ * GeneratedKeyListener applies this generator to `#[ORM\GeneratedValue]` keys automatically.
  */
 class FMIdentityGenerator extends AbstractIdGenerator
 {
@@ -54,7 +56,7 @@ class FMIdentityGenerator extends AbstractIdGenerator
         }
 
         if ('rec_id' === $idColumn) {
-            return $recordId;
+            return $this->asIdentifier($recordId, $class, $connection);
         }
 
         $uri = sprintf('layouts/%s/records/%s', $class->getTableName(), $recordId);
@@ -75,7 +77,17 @@ class FMIdentityGenerator extends AbstractIdGenerator
             ));
         }
 
-        return (string)$id;
+        return $this->asIdentifier($id, $class, $connection);
+    }
+
+    /**
+     * Converts the value as its field's type would, so that an integer serial number arrives as an int
+     */
+    private function asIdentifier(mixed $value, ClassMetadata $class, Connection $connection): mixed
+    {
+        $type = $class->getFieldMapping($class->getSingleIdentifierFieldName())->type;
+
+        return Type::getType($type)->convertToPHPValue((string)$value, $connection->getDatabasePlatform());
     }
 
     public function isPostInsertGenerator(): bool

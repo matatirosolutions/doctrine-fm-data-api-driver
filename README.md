@@ -92,29 +92,9 @@ value they can't parse) into `null` rather than throwing, so map those propertie
    private ?int $id = null;
    ```
 
-3. Create your 'actual' ID field, as used for relationships, as a separate property of your model. Set its GeneratedValue
-   strategy to be `CUSTOM` which will mean that Doctrine will wait for FM to assign that value - the assumption being that this
-   is an auto-enter calc field (probably Get(UUID)). You then need to specify the CustomIdGenerator and set this to
-   `MSDev\DoctrineFMDataAPIDriver\Id\FMIdentityGenerator` so that the value is returned as a string.
-
-   Map the column with `insertable: false`. That stops Doctrine sending an empty value with the INSERT, which would replace the one
-   FileMaker generates. After the INSERT the generator reads the value back from the new record (if you forget, it tells you).
-
-   ```php
-   use MSDev\DoctrineFMDataAPIDriver\Id\FMIdentityGenerator;
-
-   #[ORM\Id]
-   #[ORM\Column(name: '__pk_ClientID', type: 'string', length: 255, insertable: false)]
-   #[ORM\GeneratedValue(strategy: 'CUSTOM')]
-   #[ORM\CustomIdGenerator(class: FMIdentityGenerator::class)]
-   private ?string $uuid = null;
-   ```
-
-   If you'd rather use FileMaker's own record id as the identifier, map `rec_id` as the id with `#[ORM\GeneratedValue(strategy: 'IDENTITY')]`
-   and no custom generator.
-
-   Alternatively you could generate the UUIDs in your model constructor (using for example [ramsey/uuid](https://github.com/ramsey/uuid)).
-   In this case you'd end up with something like
+3. Create your 'actual' ID field, as used for relationships, as a separate property of your model. Usually your application assigns
+   the key itself, for example a UUID generated in the constructor (using [ramsey/uuid](https://github.com/ramsey/uuid), say). It is
+   sent to FileMaker with the INSERT, and needs nothing special:
 
    ```php
    #[ORM\Id]
@@ -126,6 +106,34 @@ value they can't parse) into `null` rather than throwing, so map those propertie
        $this->uuid = Uuid::uuid4()->toString();
    }
    ```
+
+   **Keys which FileMaker assigns** (a serial number, or an auto-enter Get(UUID)) are mapped with `#[ORM\GeneratedValue]`, and need the
+   driver's `GeneratedKeyListener` registered for Doctrine's `loadClassMetadata` event. The listener reads the key back from the record
+   which was created, and converts it with the field's type, so a serial number arrives as an int. Without it Doctrine uses FileMaker's
+   record id as the key. [doctrine-filemaker-driver-bundle](https://github.com/matatirosolutions/doctrine-filemaker-driver-bundle)
+   registers it for you (1.11 onwards); otherwise, with DoctrineBundle:
+
+   ```yaml
+   # config/services.yaml
+   services:
+       MSDev\DoctrineFMDataAPIDriver\Id\GeneratedKeyListener:
+           tags: [{ name: doctrine.event_listener, event: loadClassMetadata }]
+   ```
+
+   ```php
+   #[ORM\Id]
+   #[ORM\Column(name: 'InvoiceID', type: 'integer')]
+   #[ORM\GeneratedValue]
+   private ?int $id = null;
+   ```
+
+   The listener applies `MSDev\DoctrineFMDataAPIDriver\Id\FMIdentityGenerator` to those keys. You can also map that generator
+   yourself, with `#[ORM\GeneratedValue(strategy: 'CUSTOM')]` and `#[ORM\CustomIdGenerator(class: FMIdentityGenerator::class)]`. If you
+   do, map the column with `insertable: false`, so that Doctrine doesn't send an empty value which would replace the one FileMaker
+   generates (if you forget, the generator tells you).
+
+   If you'd rather use FileMaker's own record id as the identifier, map `rec_id` as the id with `#[ORM\GeneratedValue(strategy: 'IDENTITY')]`.
+   The listener leaves that alone.
 
 4. Add other properties as required. To access related fields on your layout enclose the field name in single quotes in the column mapping.
 
