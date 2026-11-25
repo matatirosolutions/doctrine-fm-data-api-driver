@@ -237,7 +237,7 @@ class FMRequest
         $this->baseURI =
             (str_starts_with($this->params['host'], 'http') ? $this->params['host'] : 'https://' . $this->params['host']) .
             (in_array((int)$this->params['port'], [80, 443], true) ? '' : ':'.$this->params['port']) .
-            ('/' === substr($this->params['host'], -1) ? '' : '/') .
+            (str_ends_with($this->params['host'], '/') ? '' : '/') .
             'fmi/data/v1/databases/' .
             $this->params['dbname'] . '/';
     }
